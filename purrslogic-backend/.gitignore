@@ -1,0 +1,15 @@
+# Environment & secrets
+.env
+config/purrslogic-gcp-key.json
+config/*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/

@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.env
+*.json
+purrslogic-backend/config/*.json
+purrslogic-backend/.env
