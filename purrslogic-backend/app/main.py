@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 # from pymongo import MongoClient
 # from pymongo.errors import ConnectionFailure
 from app.services.bigquery_service import BigQueryService
+from app.services.calendar_service import GoogleCalendarService
+from app.services.gemini_service import GeminiService
 
 # Load environment variables
 load_dotenv()
@@ -51,3 +53,22 @@ async def get_recovery_summary(limit: int = 7):
         "count": len(data) if isinstance(data, list) else 0,
         "data": data
     }
+    
+    
+@app.get("/api/v1/calendar/today")
+async def get_today_calendar():
+    try:
+        # initialize the service only when the route is clicked, so it doesn't block Uvicorn startup
+        calendar_service = GoogleCalendarService()
+        events = calendar_service.get_today_events()
+        
+        if isinstance(events, dict) and "error" in events:
+            raise HTTPException(status_code=400, detail=events["error"])
+            
+        return {
+            "status": "success",
+            "count": len(events),
+            "events": events
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
