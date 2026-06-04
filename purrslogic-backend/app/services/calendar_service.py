@@ -74,3 +74,39 @@ class GoogleCalendarService:
         except Exception as e:
             print(f"Error fetching calendar events: {e}")
             return {"error": str(e)}
+        
+    def get_historical_events(self, months_back: int = 3) -> list:
+      
+        import datetime # ensure datetime is available within the function
+        
+        local_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
+        # calculate the start time 3 months ago
+        start_time = (local_now - datetime.timedelta(days=30 * months_back)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        end_time = local_now.isoformat()
+
+        try:
+            print(f"⏳ [Purrslogic Historical Mining] Fetching historical calendar events for the last {months_back} months...")
+            events_result = self.service.events().list(
+                calendarId='primary',
+                timeMin=start_time,
+                timeMax=end_time,
+                singleEvents=True,
+                orderBy='startTime',
+                maxResults=500  # give enough historical allowance
+            ).execute()
+            
+            events = events_result.get('items', [])
+            
+            # 🌟 Core magic: use set collection to perform literal de-duplication
+            unique_titles = set()
+            for event in events:
+                summary = event.get('summary')
+                if summary:  # exclude blank events without titles
+                    unique_titles.add(summary.strip())
+            
+            # sort and convert back to List, convenient for JSON transmission and frontend display
+            return sorted(list(unique_titles))
+
+        except Exception as e:
+            print(f"❌ Historical event fetching failed: {e}")
+            return {"error": str(e)}

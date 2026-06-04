@@ -28,7 +28,7 @@ async def root():
     return {
         "status": "online",
         "project": "Purrslogic",
-        "message": "Welcome to Purrslogic AI Agent Backend Center! 🐈‍⬛"
+        "version": "V1-Core"
     }
 
 # @app.get("/api/health-check")
@@ -69,6 +69,24 @@ async def get_today_calendar():
             "status": "success",
             "count": len(events),
             "events": events
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/api/v1/calendar/onboarding-history")
+async def get_onboarding_history(months: int = 3):
+    try:
+        calendar_service = GoogleCalendarService()
+        unique_titles = calendar_service.get_historical_events(months_back=months)
+        
+        if isinstance(unique_titles, dict) and "error" in unique_titles:
+            raise HTTPException(status_code=400, detail=unique_titles["error"])
+            
+        return {
+            "status": "success",
+            "message": "Successfully fetched historical unique events! Please let the user fill in the five-dimensional life energy matrix for these high-frequency events.",
+            "count": len(unique_titles),
+            "unique_titles": unique_titles
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
