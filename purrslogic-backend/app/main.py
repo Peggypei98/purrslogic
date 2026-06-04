@@ -1,11 +1,13 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from dotenv import load_dotenv
 # from pymongo import MongoClient
 # from pymongo.errors import ConnectionFailure
 from app.services.bigquery_service import BigQueryService
 from app.services.calendar_service import GoogleCalendarService
 from app.services.gemini_service import GeminiService
+from app.config.database import db
+from app.schemas.user_schema import UserOnboardingSubmit
 
 # Load environment variables
 load_dotenv()
@@ -87,6 +89,47 @@ async def get_onboarding_history(months: int = 3):
             "message": "Successfully fetched historical unique events! Please let the user fill in the five-dimensional life energy matrix for these high-frequency events.",
             "count": len(unique_titles),
             "unique_titles": unique_titles
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/api/v1/calendar/onboarding-submit")
+async def submit_onboarding_rules(payload: UserOnboardingSubmit):
+    try:
+        user_filter = {"user_id": payload.user_id}
+        
+        # Convert Pydantic model to dictionary format that can be directly inserted into MongoDB
+        update_data = {
+            "$set": {
+                "email": payload.email,
+                "onboarding_completed": True,
+                "custom_heuristic_rules": [rule.dict() for rule in payload.custom_heuristic_rules]
+            }
+        }
+        
+        # Use upsert=True: if the user doesn't exist, create a new document, otherwise overwrite the rules precisely
+        result = await db.user_profiles.update_one(user_filter, update_data, upsert=True)
+        
+        return {
+            "status": "success",
+            "message": f"Successfully wrote {len(payload.custom_heuristic_rules)} personalized life energy rules into MongoDB cloud memory store!",
+            "user_id": payload.user_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/api/v1/user/profile")
+async def get_user_profile(user_id: str = "peggy_pei_28"):
+    try:
+        profile = await db.user_profiles.find_one({"user_id": user_id})
+        if not profile:
+            raise HTTPException(status_code=404, detail="User profile not found, please complete the onboarding submission first.")
+        
+        # Remove MongoDB automatically generated ObjectId to prevent JSON serialization failure
+        profile.pop("_id", None)
+        return {
+            "status": "success",
+            "profile": profile
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
