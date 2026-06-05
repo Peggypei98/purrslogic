@@ -10,7 +10,7 @@ from app.config.database import db
 from app.schemas.user_schema import UserOnboardingSubmit
 from app.services.classifier_service import DynamicEventClassifierService
 from app.services.recovery_service import MicroRecoveryService
-
+from app.services.gemini_service import PurrslogicBrainService
 # from pymongo import MongoClient
 # from pymongo.errors import ConnectionFailure
 # from app.services.gemini_service import GeminiService
@@ -31,6 +31,8 @@ bq_service = BigQueryService() if BigQueryService else None
 classifier_service = DynamicEventClassifierService()
 # Initialize the recovery tool engine
 recovery_service = MicroRecoveryService() 
+# Initialize the Gemini reasoning engine
+brain_service = PurrslogicBrainService()
     
 
 @app.get("/")
@@ -143,10 +145,9 @@ async def get_today_calendar(
                 needed_charge=abs(remaining_energy_net),
                 limit=2
             )
-
-        return {
-            "status": "success",
-            "user_id": user_id,
+            
+        # 7. Bundle everything and invoke Gemini reasoning
+        payload_for_ai = {
             "triage_summary": {
                 "status_code": triage_status,
                 "is_overloaded_warning": is_overloaded,
@@ -154,9 +155,23 @@ async def get_today_calendar(
                 "total_agenda_cost_burn": total_agenda_cost,
                 "remaining_net_energy": remaining_energy_net
             },
+            "proactive_interventions": recommendations,
+            "events": classified_events
+        }
+        
+        # Ask Gemini to generate a highly customized, witty, and rule-compliant plan
+        ai_coaching_insight = brain_service.generate_triage_coaching(triage_data=payload_for_ai)
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "triage_summary": payload_for_ai["triage_summary"],
+            "agent_decision_center": ai_coaching_insight,
             "proactive_interventions": recommendations if is_overloaded else [],
             "events": classified_events
         }
+        
+        
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
