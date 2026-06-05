@@ -159,15 +159,15 @@ async def get_today_calendar(
             "events": classified_events
         }
         
-        # Ask Gemini to generate a highly customized, witty, and rule-compliant plan
-        ai_coaching_insight = brain_service.generate_triage_coaching(triage_data=payload_for_ai)
+        # Invoke the advanced Purrslogic Brain (including Tool Calling execution loop)
+        brain_response = brain_service.generate_triage_coaching(triage_data=payload_for_ai)
 
         return {
             "status": "success",
             "user_id": user_id,
             "triage_summary": payload_for_ai["triage_summary"],
-            "agent_decision_center": ai_coaching_insight,
-            "proactive_interventions": recommendations if is_overloaded else [],
+            "agent_decision_center": brain_response.get("agent_coaching_text"),
+            "proactive_interventions": brain_response.get("automated_actions_executed", []),
             "events": classified_events
         }
         

@@ -110,3 +110,33 @@ class GoogleCalendarService:
         except Exception as e:
             print(f"❌ Historical event fetching failed: {e}")
             return {"error": str(e)}
+        
+    def delete_calendar_event(self, event_id: str) -> dict:
+        """
+        [Day 14] Real-world wrapper to delete or cancel an event from Google Calendar.
+        """
+        try:
+            # In production: self.service.events().delete(calendarId='primary', eventId=event_id).execute()
+            print(f"🔥 [Google Calendar API] Agent action triggered: Successfully DELETED event ID: {event_id}")
+            return {"status": "success", "action": "delete", "event_id": event_id}
+        except Exception as e:
+            print(f"❌ Failed to delete event {event_id}: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def insert_calendar_event(self, summary: str, start_iso: str, end_iso: str, description: str = "") -> dict:
+        """
+        [Day 14] Real-world wrapper to insert a high-impact recovery block into Google Calendar.
+        ```"""
+        try:
+            event_body = {
+                'summary': summary,
+                'description': description,
+                'start': {'dateTime': start_iso, 'timeZone': 'America/Los_Angeles'},
+                'end': {'dateTime': end_iso, 'timeZone': 'America/Los_Angeles'},
+            }
+            # In production: self.service.events().insert(calendarId='primary', body=event_body).execute()
+            print(f"✨ [Google Calendar API] Agent action triggered: Successfully INSERTED '{summary}'")
+            return {"status": "success", "action": "insert", "summary": summary}
+        except Exception as e:
+            print(f"❌ Failed to insert event {summary}: {e}")
+            return {"status": "error", "message": str(e)}

@@ -1,7 +1,9 @@
 import os
+import json
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from app.services.calendar_service import GoogleCalendarService
 
 load_dotenv()
 
@@ -12,52 +14,67 @@ class PurrslogicBrainService:
         self.client = genai.Client()
         # Using the flagship production model for smart text reasoning
         self.model_name = "gemini-2.5-flash"
+        self.calendar_api = GoogleCalendarService()
 
     def generate_triage_coaching(self, triage_data: dict) -> str:
         """
-        Executes Prompt Engineering to analyze the 5D energy matrix, 
-        performs linear schedule trimming, and injects micro-recovery interventions.
+        Empowers Gemini to reason over data AND fire tool calls 
+        to actively modify Google Calendar when an energy deficit occurs.
         """
         
-        system_instruction = """
-        You are the proactive core intelligence of 'Purrslogic', a personalized Personal Operating System focused on human energy management.
-        Your owner is Peggy, a 28-year-old Full-stack Software Engineer who balances heavy cognitive work (like Online Assessments and Interviews) with fitness (Pilates/FS8) and cares deeply for her four cats: Lulu, Gray, Fay Fay, and a black-and-white cat.
-
-        CRITICAL OPERATIONAL MATRIX LOGIC:
-        1. You will be fed a clean JSON containing 'triage_summary', 'proactive_interventions', and a list of tagged 'events' with a 5D energy matrix.
-        2. If 'is_overloaded_warning' is true, you MUST act as an elite triage commander. 
-        3. Execute Linear Schedule Trimming:
-           - Scan the events list.
-           - Prioritize postponing or cancelling events where priority is 'OPTIONAL' (e.g., Laundry) first.
-           - Next, look into 'FLEXIBLE' events with low 'desire_score' if more energy recovery is needed.
-           - NEVER propose moving 'IMMOVABLE' events (e.g., Interviews, Online Assessments).
-        4. Execute Dynamic Recovery Injection:
-           - Look at 'proactive_interventions' (which contains high battery_impact activities like petting cats).
-           - Explicitly tell Peggy WHERE to insert these recovery blocks (e.g., 'Right after your heavy interview, take a 15-minute break to pet Lulu and Gray').
-
-        TONE GUIDE:
-        Be deeply empathetic, validating, professional, yet witty and warm. Speak directly to Peggy. 
-        Incorporate her specific context naturally without being rigid. For example, if she is heavily overloaded, validate her hard work on tech assessments, joke lightly about cats ready to comfort her or tear up the place if she overworks, and give her a concrete, scannable action plan.
+        # Define the executable tool functions mapping for the agent loop
+        available_tools = {
+            "delete_calendar_event": self.calendar_api.delete_calendar_event,
+            "insert_calendar_event": self.calendar_api.insert_calendar_event
+        }
         
-        OUTPUT FORMAT:
-        Return your response in clean Markdown with clear sections:
-        ### 🚨 Energy Status Analysis
-        ### ✂️ Linear Schedule Trimming (Actions Required)
-        ### 🐈‍⬛ Proactive Recharge Injection
+        system_instruction = """
+        You are the proactive core intelligence of 'Purrslogic'. You possess direct writing access to Peggy's Google Calendar.
+        
+        YOUR CRITICAL OPERATIONAL PROTOCOL:
+        1. Review the input JSON matrix. If 'is_overloaded_warning' is true, you MUST execute tool calls to optimize her day.
+        2. Scan her schedule. If there is an 'OPTIONAL' task like 'Laundry', you MUST immediately call 'delete_calendar_event' using its exact summary/context to clear her schedule.
+        3. Simultaneously, scan 'proactive_interventions'. You MUST call 'insert_calendar_event' to inject her high-impact recovery blocks (e.g., 'Petting Cats') right after her highest-cognitive events (like Interviews or Online Assessments).
+        4. Always output a brief summary to Peggy explaining what automated executive actions you just performed on her calendar.
         """
 
         try:
-            # Wrap the structured payload into a clean string for Gemini
-            user_prompt = f"Here is today's structured energy telemetry payload. Please perform schedule triage and output your coaching insights:\n\n{triage_data}"
+            user_prompt = f"Here is today's telemetry payload. Perform dynamic triage and execute necessary tool actions:\n\n{json.dumps(triage_data)}"
 
+            # Pass the raw python functions directly into the next-gen SDK tools list
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=user_prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    temperature=0.3, # Low temperature for reliable, rule-following logic
+                    tools=[self.calendar_api.delete_calendar_event, self.calendar_api.insert_calendar_event],
+                    temperature=0.2
                 )
             )
-            return response.text
+
+            executed_actions_log = []
+
+            # 🌟 [Tool Calling Engine Core] Parse and execute function calls requested by Gemini
+            if response.function_calls:
+                print(f"🤖 [Gemini Brain] Tool call requested! Found {len(response.function_calls)} actions.")
+                for call in response.function_calls:
+                    tool_name = call.name
+                    tool_args = call.args
+                    
+                    if tool_name in available_tools:
+                        print(f"⚙️ [Agent Execution] Invoking tool: {tool_name} with args: {tool_args}")
+                        # Execute the actual Python function dynamically
+                        result = available_tools[tool_name](**tool_args)
+                        executed_actions_log.append({
+                            "tool_invoked": tool_name,
+                            "arguments": tool_args,
+                            "result": result
+                        })
+
+            return {
+                "agent_coaching_text": response.text or "Automated event remediation loop completed successfully.",
+                "automated_actions_executed": executed_actions_log
+            }
+
         except Exception as e:
-            return f"❌ Gemini Brain Service error: {str(e)}"
+            return {"error": f"❌ Agent Engine failed: {str(e)}"}
