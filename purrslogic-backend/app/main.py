@@ -1,17 +1,20 @@
 import os
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
-# from pymongo import MongoClient
-# from pymongo.errors import ConnectionFailure
+from typing import Optional
+
+# Import all custom services and databases
 from app.services.bigquery_service import BigQueryService
 from app.services.calendar_service import GoogleCalendarService
-from app.services.gemini_service import GeminiService
 from app.config.database import db
 from app.schemas.user_schema import UserOnboardingSubmit
 from app.services.classifier_service import DynamicEventClassifierService
+from app.services.recovery_service import MicroRecoveryService
 
-# Initialize the classification service
-classifier_service = DynamicEventClassifierService()
+# from pymongo import MongoClient
+# from pymongo.errors import ConnectionFailure
+# from app.services.gemini_service import GeminiService
+
 
 # Load environment variables
 load_dotenv()
@@ -21,64 +24,20 @@ app = FastAPI(
     description="The brain center for personalized proactive calendar triaging.",
     version="1.0.0"
 )
+
 # Initialize services
-try:
-    bq_service = BigQueryService()
-except Exception as e:
-    print(f"⚠️ BigQuery Service Initialization Failed: {e}")
-    bq_service = None
+bq_service = BigQueryService() if BigQueryService else None
+# Initialize the classification service
+classifier_service = DynamicEventClassifierService()
+# Initialize the recovery tool engine
+recovery_service = MicroRecoveryService() 
     
 
 @app.get("/")
 async def root():
-    return {
-        "status": "online",
-        "project": "Purrslogic",
-        "version": "V1-Core"
-    }
+    return {"status": "online", "project": "Purrslogic", "version": "V1-Core"}
 
-# @app.get("/api/health-check")
-# async def health_check():
-#     return {"status": "healthy", "database": "connected_placeholder"}
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run("main.py", host="127.0.0.1", port=8000, reload=True)
-@app.get("/api/v1/recovery-summary")
-async def get_recovery_summary(limit: int = 7):
-    if not bq_service:
-        raise HTTPException(status_code=500, detail="BigQuery service is unavailable")
-    
-    data = bq_service.get_daily_recovery_summary(limit=limit)
-    
-    if isinstance(data, dict) and "error" in data:
-        raise HTTPException(status_code=400, detail=data["error"])
-        
-    return {
-        "status": "success",
-        "count": len(data) if isinstance(data, list) else 0,
-        "data": data
-    }
-    
-    
-@app.get("/api/v1/calendar/today")
-async def get_today_calendar():
-    try:
-        # initialize the service only when the route is clicked, so it doesn't block Uvicorn startup
-        calendar_service = GoogleCalendarService()
-        events = calendar_service.get_today_events()
-        
-        if isinstance(events, dict) and "error" in events:
-            raise HTTPException(status_code=400, detail=events["error"])
-            
-        return {
-            "status": "success",
-            "count": len(events),
-            "events": events
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+# Fetch unique historical event titles for onboarding
 @app.get("/api/v1/calendar/onboarding-history")
 async def get_onboarding_history(months: int = 3):
     try:
@@ -90,13 +49,13 @@ async def get_onboarding_history(months: int = 3):
             
         return {
             "status": "success",
-            "message": "Successfully fetched historical unique events! Please let the user fill in the five-dimensional life energy matrix for these high-frequency events.",
             "count": len(unique_titles),
             "unique_titles": unique_titles
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+# Store the 5D matrix textbook rules into MongoDB Atlas cloud memory store
 @app.post("/api/v1/calendar/onboarding-submit")
 async def submit_onboarding_rules(payload: UserOnboardingSubmit):
     try:
@@ -112,7 +71,7 @@ async def submit_onboarding_rules(payload: UserOnboardingSubmit):
         }
         
         # Use upsert=True: if the user doesn't exist, create a new document, otherwise overwrite the rules precisely
-        result = await db.user_profiles.update_one(user_filter, update_data, upsert=True)
+        await db.user_profiles.update_one(user_filter, update_data, upsert=True)
         
         return {
             "status": "success",
@@ -121,7 +80,8 @@ async def submit_onboarding_rules(payload: UserOnboardingSubmit):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+# Read the user's custom matrix profile
 @app.get("/api/v1/user/profile")
 async def get_user_profile(user_id: str = "peggy_pei_28"):
     try:
@@ -137,40 +97,64 @@ async def get_user_profile(user_id: str = "peggy_pei_28"):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+# Fetch today's calendar events
 @app.get("/api/v1/calendar/today")
-async def get_classified_events(user_id: str = "peggy_pei_28"):
+async def get_today_calendar(
+    user_id: str = "peggy_pei_28",
+    simulate_budget: Optional[int] = None
+):
     try:
-        # 1. Retrieve the user's personal life energy rules from MongoDB
+        # 1. Fetch custom rules matrix from MongoDB Atlas
         user_profile = await db.user_profiles.find_one({"user_id": user_id})
-        
-        # Defense mechanism: if the user hasn't completed onboarding, give an empty list to prevent program crash
-        custom_rules = []
-        if user_profile and "custom_heuristic_rules" in user_profile:
-            custom_rules = user_profile["custom_heuristic_rules"]
+        custom_rules = user_profile.get("custom_heuristic_rules", []) if user_profile else []
             
-        # 2. Retrieve the raw events from Google Calendar for today
+        # 2. Fetch raw today's agenda from Google Calendar API
         calendar_service = GoogleCalendarService()
         raw_events = calendar_service.get_today_events()
-        
         if isinstance(raw_events, dict) and "error" in raw_events:
             raise HTTPException(status_code=400, detail=raw_events["error"])
             
-        # 3. Core magic: throw the raw events and database rules into the engine, produce tagged events and total energy consumption
+        # 3. Dynamic 5D energy matrix matching & summation
         classified_events, total_mental_cost, total_physical_cost = classifier_service.calculate_and_tag_agenda(
             raw_events=raw_events,
             custom_rules=custom_rules
         )
+        total_agenda_cost = total_mental_cost + total_physical_cost
+
+        # 4. Defensive handling for health metrics budget
+        if simulate_budget is not None:
+            today_health_budget = simulate_budget
+        else:
+            today_health_budget = bq_service.get_today_health_budget(user_id=user_id) if bq_service else 45
+
+        # 5. Core Mathematical Energy Accounting Formula
+        remaining_energy_net = today_health_budget - total_agenda_cost
         
-        # 4. Return the highly structured and mathematically valuable complete JSON
+        # 6. Proactive Overload Triaging Mode
+        is_overloaded = remaining_energy_net < 0
+        recommendations = []
+        triage_status = "HEALTHY_BALANCED"
+
+        if is_overloaded:
+            triage_status = "ENERGY_OVERLOAD_WARNING"
+            recommendations = recovery_service.get_top_recommendations(
+                needed_charge=abs(remaining_energy_net),
+                limit=2
+            )
+
         return {
             "status": "success",
             "user_id": user_id,
-            "summary_metrics": {
-                "total_events_count": len(classified_events),
-                "today_total_mental_cost": total_mental_cost,     # 🌟 Today's total mental energy consumption
-                "today_total_physical_cost": total_physical_cost  # 🌟 Today's total physical energy consumption
+            "triage_summary": {
+                "status_code": triage_status,
+                "is_overloaded_warning": is_overloaded,
+                "physiological_budget": today_health_budget,
+                "total_agenda_cost_burn": total_agenda_cost,
+                "remaining_net_energy": remaining_energy_net
             },
+            "proactive_interventions": recommendations if is_overloaded else [],
             "events": classified_events
         }
         

@@ -75,3 +75,18 @@ class BigQueryService:
         except Exception as e:
             print(f"Error querying BigQuery: {e}")
             return {"error": str(e)}
+        
+    def get_today_health_budget(self, user_id: str) -> int:
+        """
+        [Day 12] Fetches Apple Watch physiological telemetry (HRV, Sleep, Resting HR) 
+        from BigQuery and calculates today's baseline energy pool budget.
+        """
+        try:
+            # TODO: In future iterations, execute actual SQL query against BigQuery table
+            # For now, we simulate a realistic daily health budget based on standard vitals.
+            # A perfect night gives 50 points, a standard night gives 35-40 points.
+            mock_health_budget = 45 
+            return mock_health_budget
+        except Exception as e:
+            print(f"❌ Failed to fetch health metrics from BigQuery: {e}")
+            return 35 # Safe fallback budget if data pipe fails
