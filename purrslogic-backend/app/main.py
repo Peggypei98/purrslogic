@@ -8,6 +8,10 @@ from app.services.calendar_service import GoogleCalendarService
 from app.services.gemini_service import GeminiService
 from app.config.database import db
 from app.schemas.user_schema import UserOnboardingSubmit
+from app.services.classifier_service import DynamicEventClassifierService
+
+# Initialize the classification service
+classifier_service = DynamicEventClassifierService()
 
 # Load environment variables
 load_dotenv()
@@ -131,5 +135,44 @@ async def get_user_profile(user_id: str = "peggy_pei_28"):
             "status": "success",
             "profile": profile
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/api/v1/calendar/today")
+async def get_classified_events(user_id: str = "peggy_pei_28"):
+    try:
+        # 1. Retrieve the user's personal life energy rules from MongoDB
+        user_profile = await db.user_profiles.find_one({"user_id": user_id})
+        
+        # Defense mechanism: if the user hasn't completed onboarding, give an empty list to prevent program crash
+        custom_rules = []
+        if user_profile and "custom_heuristic_rules" in user_profile:
+            custom_rules = user_profile["custom_heuristic_rules"]
+            
+        # 2. Retrieve the raw events from Google Calendar for today
+        calendar_service = GoogleCalendarService()
+        raw_events = calendar_service.get_today_events()
+        
+        if isinstance(raw_events, dict) and "error" in raw_events:
+            raise HTTPException(status_code=400, detail=raw_events["error"])
+            
+        # 3. Core magic: throw the raw events and database rules into the engine, produce tagged events and total energy consumption
+        classified_events, total_mental_cost, total_physical_cost = classifier_service.calculate_and_tag_agenda(
+            raw_events=raw_events,
+            custom_rules=custom_rules
+        )
+        
+        # 4. Return the highly structured and mathematically valuable complete JSON
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "summary_metrics": {
+                "total_events_count": len(classified_events),
+                "today_total_mental_cost": total_mental_cost,     # 🌟 Today's total mental energy consumption
+                "today_total_physical_cost": total_physical_cost  # 🌟 Today's total physical energy consumption
+            },
+            "events": classified_events
+        }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
