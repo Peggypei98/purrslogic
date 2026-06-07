@@ -11,6 +11,7 @@ from app.schemas.user_schema import UserOnboardingSubmit
 from app.services.classifier_service import DynamicEventClassifierService
 from app.services.recovery_service import MicroRecoveryService
 from app.services.gemini_service import PurrslogicBrainService
+from app.config.observability import init_agent_observability
 # from pymongo import MongoClient
 # from pymongo.errors import ConnectionFailure
 # from app.services.gemini_service import GeminiService
@@ -18,6 +19,10 @@ from app.services.gemini_service import PurrslogicBrainService
 
 # Load environment variables
 load_dotenv()
+
+# Initialize the observability system
+init_agent_observability()
+
 
 app = FastAPI(
     title="Purrslogic AI Agent API",
@@ -33,7 +38,6 @@ classifier_service = DynamicEventClassifierService()
 recovery_service = MicroRecoveryService() 
 # Initialize the Gemini reasoning engine
 brain_service = PurrslogicBrainService()
-    
 
 @app.get("/")
 async def root():
@@ -115,8 +119,8 @@ async def get_today_calendar(
         # 2. Fetch raw today's agenda from Google Calendar API
         calendar_service = GoogleCalendarService()
         raw_events = calendar_service.get_today_events()
-        if isinstance(raw_events, dict) and "error" in raw_events:
-            raise HTTPException(status_code=400, detail=raw_events["error"])
+        if isinstance(raw_events, dict):
+            raise HTTPException(status_code=400, detail=raw_events.get("error", "Failed to fetch calendar events"))
             
         # 3. Dynamic 5D energy matrix matching & summation
         classified_events, total_mental_cost, total_physical_cost = classifier_service.calculate_and_tag_agenda(
@@ -162,6 +166,9 @@ async def get_today_calendar(
         # Invoke the advanced Purrslogic Brain (including Tool Calling execution loop)
         brain_response = brain_service.generate_triage_coaching(triage_data=payload_for_ai)
 
+        if "error" in brain_response:
+            raise HTTPException(status_code=503, detail=brain_response["error"])
+
         return {
             "status": "success",
             "user_id": user_id,
@@ -173,5 +180,7 @@ async def get_today_calendar(
         
         
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

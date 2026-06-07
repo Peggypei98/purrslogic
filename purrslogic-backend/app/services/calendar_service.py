@@ -1,12 +1,24 @@
-import os
 import datetime
 from pathlib import Path
+from typing import Any, Protocol, cast
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+
+class _CalendarEventsResource(Protocol):
+    def list(self, **kwargs: Any) -> Any: ...
+
+
+class _CalendarResource(Protocol):
+    def events(self) -> _CalendarEventsResource: ...
+
+
 class GoogleCalendarService:
+    service: _CalendarResource
+
     def __init__(self):
         # for local development with VSCode debugger  
         self.SCOPES = ['https://www.googleapis.com/auth/calendar.events.readonly']
@@ -35,10 +47,14 @@ class GoogleCalendarService:
             with open(self.token_path, 'w') as token:
                 token.write(self.creds.to_json())
 
-        # 3. build Calendar API service client  
-        self.service = build('calendar', 'v3', credentials=self.creds)
+        # 3. build Calendar API service client
+        self.service = cast(_CalendarResource, build("calendar", "v3", credentials=self.creds))
 
-    def get_today_events(self):
+    def _events(self) -> _CalendarEventsResource:
+        calendar: _CalendarResource = cast(_CalendarResource, self.service)
+        return calendar.events()
+
+    def get_today_events(self) -> list[dict[str, str | None]] | dict[str, str]:
         """
         fetch all events for today (from 00:00 to 23:59)
         """
@@ -48,7 +64,7 @@ class GoogleCalendarService:
         end_of_today = local_now.replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
 
         try:
-            events_result = self.service.events().list(
+            events_result = self._events().list(
                 calendarId='primary',  # represents the primary calendar
                 timeMin=start_of_today,
                 timeMax=end_of_today,
@@ -64,9 +80,10 @@ class GoogleCalendarService:
                 end_time = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
                 
                 cleaned_events.append({
+                    "event_id": event.get("id"),
                     "summary": event.get('summary', 'Untitled Meeting'),
-                    "start": event.get('start', {}).get('dateTime' or 'date'),
-                    "end": event.get('end', {}).get('dateTime' or 'date'),
+                    "start": start_time,
+                    "end": end_time,
                     "description": event.get('description', '')
                 })
             return cleaned_events
@@ -75,7 +92,7 @@ class GoogleCalendarService:
             print(f"Error fetching calendar events: {e}")
             return {"error": str(e)}
         
-    def get_historical_events(self, months_back: int = 3) -> list:
+    def get_historical_events(self, months_back: int = 3) -> list[str] | dict[str, str]:
       
         import datetime # ensure datetime is available within the function
         
@@ -86,7 +103,7 @@ class GoogleCalendarService:
 
         try:
             print(f"⏳ [Purrslogic Historical Mining] Fetching historical calendar events for the last {months_back} months...")
-            events_result = self.service.events().list(
+            events_result = self._events().list(
                 calendarId='primary',
                 timeMin=start_time,
                 timeMax=end_time,
@@ -97,7 +114,7 @@ class GoogleCalendarService:
             
             events = events_result.get('items', [])
             
-            # 🌟 Core magic: use set collection to perform literal de-duplication
+            # Core magic: use set collection to perform literal de-duplication
             unique_titles = set()
             for event in events:
                 summary = event.get('summary')

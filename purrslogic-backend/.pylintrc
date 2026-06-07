@@ -1,0 +1,3 @@
+[TYPECHECK]
+# googleapiclient.discovery.build() returns dynamic Resource objects with API-specific methods
+generated-members=events
