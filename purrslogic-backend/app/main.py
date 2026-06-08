@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 from typing import Optional
@@ -11,6 +12,7 @@ from app.schemas.user_schema import UserOnboardingSubmit
 from app.services.classifier_service import DynamicEventClassifierService
 from app.services.recovery_service import MicroRecoveryService
 from app.services.gemini_service import PurrslogicBrainService
+from app.services.vector_service import MongoDBVectorSearchService
 from app.config.observability import init_agent_observability
 # from pymongo import MongoClient
 # from pymongo.errors import ConnectionFailure
@@ -23,11 +25,23 @@ load_dotenv()
 # Initialize the observability system
 init_agent_observability()
 
+vector_search_api = MongoDBVectorSearchService()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        await vector_search_api.seed_initial_knowledge()
+    except Exception as error:
+        print(f"⚠️ [Vector RAG] Startup seed skipped: {error}")
+    yield
+
 
 app = FastAPI(
     title="Purrslogic AI Agent API",
     description="The brain center for personalized proactive calendar triaging.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Initialize services
@@ -35,7 +49,7 @@ bq_service = BigQueryService() if BigQueryService else None
 # Initialize the classification service
 classifier_service = DynamicEventClassifierService()
 # Initialize the recovery tool engine
-recovery_service = MicroRecoveryService() 
+recovery_service = MicroRecoveryService()
 # Initialize the Gemini reasoning engine
 brain_service = PurrslogicBrainService()
 
@@ -105,6 +119,24 @@ async def get_user_profile(user_id: str = "peggy_pei_28"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/v1/knowledge/search")
+async def search_knowledge_base(q: str, limit: int = 2, user_id: str = "peggy_pei_28"):
+    """Debug endpoint: test Atlas Vector Search without invoking Gemini."""
+    try:
+        results = await vector_search_api.search_health_knowledge_base(
+            query=q,
+            limit=limit,
+            user_id=user_id,
+        )
+        if results and results[0].get("status") == "error":
+            raise HTTPException(status_code=503, detail=results[0]["message"])
+        return {"status": "success", "query": q, "results": results}
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
+
+
 # Fetch today's calendar events
 @app.get("/api/v1/calendar/today")
 async def get_today_calendar(
@@ -164,7 +196,7 @@ async def get_today_calendar(
         }
         
         # Invoke the advanced Purrslogic Brain (including Tool Calling execution loop)
-        brain_response = brain_service.generate_triage_coaching(triage_data=payload_for_ai)
+        brain_response = await brain_service.generate_triage_coaching(triage_data=payload_for_ai)
 
         if "error" in brain_response:
             raise HTTPException(status_code=503, detail=brain_response["error"])
