@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Purrslogic · Apple Health Upload</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --accent: #6ee7b7;
+      --accent-dim: #34d399;
+      --text: #e7ecf3;
+      --muted: #94a3b8;
+      --border: #2d3a4f;
+      --warn: #fbbf24;
+      --btn-text: #042f1a;
+      --gradient-top: #1e293b;
+      --drop-hover: rgba(52, 211, 153, 0.06);
+      --pill-bg: rgba(110, 231, 183, 0.15);
+      --toggle-bg: #1a2332;
+      --toggle-active: #34d399;
+      --toggle-active-text: #042f1a;
+    }
+
+    [data-theme="light"] {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --accent: #059669;
+      --accent-dim: #10b981;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --warn: #d97706;
+      --btn-text: #ffffff;
+      --gradient-top: #e2e8f0;
+      --drop-hover: rgba(16, 185, 129, 0.08);
+      --pill-bg: rgba(16, 185, 129, 0.12);
+      --toggle-bg: #e2e8f0;
+      --toggle-active: #059669;
+      --toggle-active-text: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at top, var(--gradient-top) 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      transition: background 0.25s, color 0.25s;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .toolbar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .toggle-group {
+      display: inline-flex;
+      background: var(--toggle-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .toggle-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 0.4rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .toggle-btn.active {
+      background: var(--toggle-active);
+      color: var(--toggle-active-text);
+    }
+    h1 { font-size: 1.75rem; margin: 0 0 0.25rem; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); margin-bottom: 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    h2 { font-size: 1rem; margin: 0 0 1rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+    ol.steps { margin: 0; padding-left: 1.25rem; }
+    ol.steps li { margin-bottom: 0.75rem; }
+    ol.steps strong { color: var(--text); }
+    .drop {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop:hover, .drop.dragover {
+      border-color: var(--accent-dim);
+      background: var(--drop-hover);
+    }
+    .drop input { display: none; }
+    .drop p { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    label.field { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+    button.primary {
+      width: 100%;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+      color: var(--btn-text);
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 1rem; font-size: 0.9rem; }
+    .status.error { color: #f87171; }
+    .status.ok { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    .budget-pill {
+      display: inline-block;
+      background: var(--pill-bg);
+      color: var(--accent);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+    .count-box {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .count-box span { display: block; font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+    .count-box small { color: var(--muted); font-size: 0.75rem; }
+    a { color: var(--accent-dim); }
+    .warn-note { color: var(--warn); font-size: 0.85rem; margin: 1rem 0 0; }
+    .footer-note { margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted); }
+    .counts-subtitle {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin: 0 0 0.75rem;
+    }
+    .budget-source {
+      font-size: 0.88rem;
+      margin: 0.5rem 0 1rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .budget-source.ok { border-color: var(--accent-dim); color: var(--accent); }
+    .budget-source.warn { border-color: var(--warn); color: var(--warn); }
+    .budget-source.error { border-color: #f87171; color: #f87171; }
+    .budget-pill.muted { background: var(--border); color: var(--muted); }
+    .table-caption {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 1.25rem 0 0.35rem;
+    }
+    tr.row-source { background: rgba(52, 211, 153, 0.08); }
+    [data-theme="light"] tr.row-source { background: rgba(16, 185, 129, 0.1); }
+    tr.row-today { outline: 1px solid var(--accent-dim); }
+    #progressPanel { margin-top: 1rem; }
+    .progress-bar-wrap {
+      height: 8px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    .progress-head strong { color: var(--accent); font-size: 1rem; }
+    .progress-detail { color: var(--muted); font-size: 0.82rem; min-height: 1.25rem; }
+    .stage-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+    .stage-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.45rem 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .stage-item:last-child { border-bottom: none; }
+    .stage-item.active { color: var(--text); font-weight: 600; }
+    .stage-item.done { color: var(--accent); }
+    .stage-icon {
+      width: 1.1rem;
+      flex-shrink: 0;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .stage-counts {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 0.15rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="toggle-group" id="langToggle" role="group" aria-label="Language">
+        <button type="button" class="toggle-btn active" data-lang="zh">中文</button>
+        <button type="button" class="toggle-btn" data-lang="en">EN</button>
+      </div>
+      <div class="toggle-group" id="themeToggle" role="group" aria-label="Theme">
+        <button type="button" class="toggle-btn active" data-theme="dark" data-i18n="themeDark">夜間</button>
+        <button type="button" class="toggle-btn" data-theme="light" data-i18n="themeLight">白天</button>
+      </div>
+    </div>
+
+    <h1 data-i18n="title">🐱 Purrslogic Health Upload</h1>
+    <p class="sub" data-i18n="subtitle">從 iPhone 匯出 Apple Health → 上傳 zip → 自動分析今日能量預算</p>
+
+    <div class="card" style="margin-top: 2rem;">
+      <h2 data-i18n="step1Title">Step 1 · iPhone 匯出</h2>
+      <ol class="steps">
+        <li data-i18n="step1_1"></li>
+        <li data-i18n="step1_2"></li>
+        <li data-i18n="step1_3"></li>
+        <li data-i18n="step1_4"></li>
+      </ol>
+      <p class="warn-note" data-i18n="privacyNote"></p>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="step2Title">Step 2 · 上傳並分析</h2>
+      <label class="field" for="userId" data-i18n="userIdLabel">User ID</label>
+      <input type="text" id="userId" value="peggy_pei_28" />
+
+      <div class="drop" id="dropZone">
+        <input type="file" id="fileInput" accept=".zip,.xml" />
+        <div data-i18n="dropMain">📦 拖放 <strong>export.zip</strong> 到這裡</div>
+        <p data-i18n="dropHint">或點擊選擇檔案（也支援 export.xml）</p>
+        <p id="fileName" style="color: var(--accent);"></p>
+      </div>
+
+      <button class="primary" id="uploadBtn" disabled data-i18n="uploadBtn">上傳並分析</button>
+
+      <div id="progressPanel" hidden>
+        <div class="progress-head">
+          <span id="progressLabel">—</span>
+          <strong id="progressPercent">0%</strong>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="progress-detail" id="progressDetail"></div>
+        <ul class="stage-list" id="stageList"></ul>
+      </div>
+
+      <div class="status" id="statusMsg"></div>
+    </div>
+
+    <div class="card" id="resultsCard" hidden>
+      <h2 data-i18n="step3Title">Step 3 · 分析結果</h2>
+      <p>
+        <span data-i18n="budgetLabel">今日能量預算（Pacific）：</span>
+        <span class="budget-pill" id="budget">—</span>
+      </p>
+      <div class="budget-source" id="budgetSourceNote" hidden></div>
+      <p class="counts-subtitle" data-i18n="countsSubtitle">Export 歷史總筆數（整份 zip，非今日）</p>
+      <div class="counts" id="counts"></div>
+      <p class="table-caption" data-i18n="dailyTableCaption">每日恢復指標（Pacific，主睡眠 &gt; 120 分鐘，最近 14 天）</p>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="colDate">日期</th>
+            <th data-i18n="colSleep">睡眠(分)</th>
+            <th data-i18n="colDeep">深睡%</th>
+            <th data-i18n="colHrv">HRV</th>
+            <th data-i18n="colRhr">靜息心率</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+      <p class="footer-note">
+        <span data-i18n="footerPrefix">完成後可呼叫</span>
+        <a href="/docs#/default/get_today_calendar_api_v1_calendar_today_get" target="_blank">/api/v1/calendar/today</a>
+        <span data-i18n="footerSuffix">進行日曆能量 triage（會使用剛上傳的 budget）。</span>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const I18N = {
+      zh: {
+        pageTitle: "Purrslogic · Apple Health 上傳",
+        title: "🐱 Purrslogic Health Upload",
+        subtitle: "從 iPhone 匯出 Apple Health → 上傳 zip → 自動分析今日能量預算",
+        themeDark: "夜間",
+        themeLight: "白天",
+        step1Title: "Step 1 · iPhone 匯出",
+        step1_1: "打開 <strong>設定 → 健康 → 資料輸出與存取</strong>",
+        step1_2: "點 <strong>輸出所有健康資料</strong>（Export All Health Data）",
+        step1_3: "等待產生 <strong>export.zip</strong>（檔案可能很大，需幾分鐘）",
+        step1_4: "用 AirDrop / iCloud / 傳到 Mac 或直接在 Safari 上傳此頁",
+        privacyNote: "⚠️ 僅上傳給 Purrslogic 分析，不會寫入 Apple。建議在信任的網路環境操作。",
+        step2Title: "Step 2 · 上傳並分析",
+        userIdLabel: "User ID",
+        dropMain: "📦 拖放 <strong>export.zip</strong> 到這裡",
+        dropHint: "或點擊選擇檔案（也支援 export.xml）",
+        uploadBtn: "上傳並分析",
+        uploading: (mb) => `上傳中… ${mb} MB`,
+        success: (n) => `✅ 成功解析 ${n} 天資料`,
+        stageUploading: "上傳檔案",
+        stageReceived: "檔案已接收",
+        stageExtracting: "解壓縮 export.zip",
+        stagePreprocessing: "清理 XML 格式",
+        stageParsing: "解析健康紀錄",
+        stageAggregating: "彙總每日恢復指標",
+        stageBudget: "計算能量預算",
+        stageSaving: "儲存至 MongoDB",
+        stageComplete: "完成",
+        recordDetail: (c) =>
+          `生理 ${c.vitals.toLocaleString()} · 睡眠 ${c.sleep.toLocaleString()} · 活動 ${c.activity.toLocaleString()} · 行動 ${c.mobility.toLocaleString()}`,
+        step3Title: "Step 3 · 分析結果",
+        budgetLabel: "能量預算（Pacific）：",
+        budgetSourceToday: "✓ 資料來源：今日（{date}）",
+        budgetSourceStale: "⚠ 今日無合格睡眠資料，budget 來自最近一天：<strong>{date}</strong>（非今日）",
+        budgetInsufficient: "✗ 無足夠睡眠資料，無法估算 energy budget",
+        countsSubtitle: "Export 歷史總筆數（整份 zip，非今日）",
+        dailyTableCaption: "每日恢復指標（Pacific，主睡眠 > 120 分鐘，最近 14 天）",
+        colDate: "日期",
+        colSleep: "睡眠(分)",
+        colDeep: "深睡%",
+        colHrv: "HRV",
+        colRhr: "靜息心率",
+        countVitals: "生理指標",
+        countSleep: "睡眠",
+        countActivity: "活動",
+        countMobility: "行動",
+        footerPrefix: "完成後可呼叫",
+        footerSuffix: "進行日曆能量 triage（會使用剛上傳的 budget）。",
+      },
+      en: {
+        pageTitle: "Purrslogic · Apple Health Upload",
+        title: "🐱 Purrslogic Health Upload",
+        subtitle: "Export Apple Health from iPhone → upload zip → auto-compute today's energy budget",
+        themeDark: "Dark",
+        themeLight: "Light",
+        step1Title: "Step 1 · Export on iPhone",
+        step1_1: "Open <strong>Settings → Health → Data Export & Access</strong>",
+        step1_2: "Tap <strong>Export All Health Data</strong>",
+        step1_3: "Wait for <strong>export.zip</strong> (large file — may take several minutes)",
+        step1_4: "AirDrop / iCloud to Mac, or upload directly from Safari on this page",
+        privacyNote: "⚠️ Data is sent only to Purrslogic for analysis — not written back to Apple. Use a trusted network.",
+        step2Title: "Step 2 · Upload & Analyze",
+        userIdLabel: "User ID",
+        dropMain: "📦 Drop <strong>export.zip</strong> here",
+        dropHint: "Or click to choose a file (export.xml also supported)",
+        uploadBtn: "Upload & Analyze",
+        uploading: (mb) => `Uploading… ${mb} MB`,
+        success: (n) => `✅ Parsed ${n} day(s) of data`,
+        stageUploading: "Uploading file",
+        stageReceived: "File received",
+        stageExtracting: "Extracting export.zip",
+        stagePreprocessing: "Cleaning XML",
+        stageParsing: "Parsing health records",
+        stageAggregating: "Aggregating daily recovery",
+        stageBudget: "Calculating energy budget",
+        stageSaving: "Saving to MongoDB",
+        stageComplete: "Complete",
+        recordDetail: (c) =>
+          `Vitals ${c.vitals.toLocaleString()} · Sleep ${c.sleep.toLocaleString()} · Activity ${c.activity.toLocaleString()} · Mobility ${c.mobility.toLocaleString()}`,
+        step3Title: "Step 3 · Results",
+        budgetLabel: "Energy budget (Pacific):",
+        budgetSourceToday: "✓ Data source: today ({date})",
+        budgetSourceStale: "⚠ No qualifying sleep for today — budget from most recent day: <strong>{date}</strong> (not today)",
+        budgetInsufficient: "✗ Insufficient sleep data — cannot estimate energy budget",
+        countsSubtitle: "Lifetime record counts in this export (not today only)",
+        dailyTableCaption: "Daily recovery (Pacific, main sleep > 120 min, last 14 days)",
+        colDate: "Date",
+        colSleep: "Sleep (min)",
+        colDeep: "Deep %",
+        colHrv: "HRV",
+        colRhr: "Resting HR",
+        countVitals: "Vitals",
+        countSleep: "Sleep",
+        countActivity: "Activity",
+        countMobility: "Mobility",
+        footerPrefix: "Then call",
+        footerSuffix: "for calendar energy triage (uses the budget you just uploaded).",
+      },
+    };
+
+    const COUNT_KEYS = [
+      ["vitals", "countVitals"],
+      ["sleep", "countSleep"],
+      ["activity", "countActivity"],
+      ["mobility", "countMobility"],
+    ];
+
+    const STAGE_ORDER = [
+      "uploading",
+      "received",
+      "extracting_zip",
+      "preprocessing_xml",
+      "parsing_records",
+      "aggregating",
+      "calculating_budget",
+      "saving",
+      "complete",
+    ];
+
+    const STAGE_I18N = {
+      uploading: "stageUploading",
+      received: "stageReceived",
+      extracting_zip: "stageExtracting",
+      preprocessing_xml: "stagePreprocessing",
+      parsing_records: "stageParsing",
+      aggregating: "stageAggregating",
+      calculating_budget: "stageBudget",
+      saving: "stageSaving",
+      complete: "stageComplete",
+    };
+
+    let lang = localStorage.getItem("purrslogic-lang") || "zh";
+    let theme = localStorage.getItem("purrslogic-theme") || "dark";
+    let selectedFile = null;
+    let lastResult = null;
+
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const fileName = document.getElementById("fileName");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const statusMsg = document.getElementById("statusMsg");
+    const resultsCard = document.getElementById("resultsCard");
+    const progressPanel = document.getElementById("progressPanel");
+    const progressBar = document.getElementById("progressBar");
+    const progressPercent = document.getElementById("progressPercent");
+    const progressLabel = document.getElementById("progressLabel");
+    const progressDetail = document.getElementById("progressDetail");
+    const stageList = document.getElementById("stageList");
+
+    let currentStage = "";
+    let completedStages = new Set();
+
+    function t(key, ...args) {
+      const val = I18N[lang][key];
+      if (typeof val === "function") return val(...args);
+      if (typeof val === "string" && args[0] && typeof args[0] === "object") {
+        return val.replace(/\{(\w+)\}/g, (_, k) => args[0][k] ?? "");
+      }
+      return val;
+    }
+
+    function applyLang() {
+      document.documentElement.lang = lang === "zh" ? "zh-Hant" : "en";
+      document.title = t("pageTitle");
+
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (I18N[lang][key] !== undefined) {
+          el.innerHTML = t(key);
+        }
+      });
+
+      document.querySelectorAll("#langToggle .toggle-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+
+      uploadBtn.textContent = t("uploadBtn");
+      if (lastResult) renderResults(lastResult);
+      if (!progressPanel.hidden) renderStageList(currentStage, completedStages);
+      localStorage.setItem("purrslogic-lang", lang);
+    }
+
+    function stageLabel(stage) {
+      const key = STAGE_I18N[stage];
+      return key ? t(key) : stage;
+    }
+
+    function renderStageList(activeStage, doneSet) {
+      const activeIdx = STAGE_ORDER.indexOf(activeStage);
+      stageList.innerHTML = STAGE_ORDER.map((stage, idx) => {
+        let state = "pending";
+        let icon = "○";
+        if (doneSet.has(stage) || idx < activeIdx) {
+          state = "done";
+          icon = "✓";
+        } else if (stage === activeStage) {
+          state = "active";
+          icon = "●";
+        }
+        return `<li class="stage-item ${state}"><span class="stage-icon">${icon}</span><span>${stageLabel(stage)}</span></li>`;
+      }).join("");
+    }
+
+    function updateProgress(event) {
+      const stage = event.stage || currentStage;
+      const percent = event.percent ?? 0;
+
+      if (currentStage && currentStage !== stage) {
+        completedStages.add(currentStage);
+      }
+      currentStage = stage;
+      if (stage === "complete") {
+        STAGE_ORDER.forEach((s) => completedStages.add(s));
+      }
+
+      progressPanel.hidden = false;
+      progressBar.style.width = `${percent}%`;
+      progressPercent.textContent = `${percent}%`;
+      progressLabel.textContent = stageLabel(stage);
+      renderStageList(stage, completedStages);
+
+      if (event.record_counts) {
+        progressDetail.textContent = t("recordDetail", event.record_counts);
+      } else if (event.file_size_mb) {
+        progressDetail.textContent = `${event.file_size_mb} MB`;
+      }
+    }
+
+    function resetProgress() {
+      currentStage = "uploading";
+      completedStages = new Set();
+      progressBar.style.width = "0%";
+      progressPercent.textContent = "0%";
+      progressLabel.textContent = stageLabel("uploading");
+      progressDetail.textContent = "";
+      renderStageList("uploading", completedStages);
+      progressPanel.hidden = false;
+    }
+
+    function applyTheme() {
+      document.documentElement.setAttribute("data-theme", theme);
+      document.querySelectorAll("#themeToggle .toggle-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.theme === theme);
+      });
+      localStorage.setItem("purrslogic-theme", theme);
+    }
+
+    function renderResults(data) {
+      lastResult = data;
+      const meta = data.budget_meta || {};
+      const budgetEl = document.getElementById("budget");
+      const noteEl = document.getElementById("budgetSourceNote");
+
+      if (data.today_health_budget != null) {
+        budgetEl.textContent = data.today_health_budget;
+        budgetEl.classList.remove("muted");
+      } else {
+        budgetEl.textContent = "—";
+        budgetEl.classList.add("muted");
+      }
+
+      noteEl.hidden = false;
+      noteEl.className = "budget-source";
+      if (meta.source === "today") {
+        noteEl.classList.add("ok");
+        noteEl.innerHTML = t("budgetSourceToday", { date: meta.source_date || meta.today_date_pacific });
+      } else if (meta.source === "stale") {
+        noteEl.classList.add("warn");
+        noteEl.innerHTML = t("budgetSourceStale", { date: meta.source_date || "?" });
+      } else {
+        noteEl.classList.add("error");
+        noteEl.innerHTML = t("budgetInsufficient");
+      }
+
+      const counts = data.record_counts || {};
+      document.getElementById("counts").innerHTML = COUNT_KEYS.map(([k, labelKey]) =>
+        `<div class="count-box"><span>${(counts[k] || 0).toLocaleString()}</span><small>${t(labelKey)}</small></div>`
+      ).join("");
+
+      const sourceDate = meta.source_date;
+      const todayPacific = meta.today_date_pacific;
+      document.getElementById("summaryBody").innerHTML = (data.daily_recovery_summary || []).map((row) => {
+        const isSource = sourceDate && row.date === sourceDate;
+        const isToday = todayPacific && row.date === todayPacific;
+        const rowClass = isSource ? "row-source" : isToday ? "row-today" : "";
+        return `
+        <tr class="${rowClass}">
+          <td>${row.date}${isSource ? " ★" : ""}</td>
+          <td>${row.total_sleep_minutes ?? "—"}</td>
+          <td>${row.deep_sleep_ratio_pct ?? "—"}</td>
+          <td>${row.hrv_ms ?? "—"}</td>
+          <td>${row.resting_heart_rate_bpm ?? "—"}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    document.getElementById("langToggle").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-lang]");
+      if (!btn) return;
+      lang = btn.dataset.lang;
+      applyLang();
+    });
+
+    document.getElementById("themeToggle").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-theme]");
+      if (!btn) return;
+      theme = btn.dataset.theme;
+      applyTheme();
+    });
+
+    dropZone.addEventListener("click", () => fileInput.click());
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      if (e.dataTransfer.files.length) pickFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length) pickFile(fileInput.files[0]);
+    });
+
+    function pickFile(file) {
+      selectedFile = file;
+      fileName.textContent = file.name;
+      uploadBtn.disabled = false;
+      statusMsg.textContent = "";
+      statusMsg.className = "status";
+    }
+
+    uploadBtn.addEventListener("click", async () => {
+      if (!selectedFile) return;
+      const userId = document.getElementById("userId").value.trim() || "peggy_pei_28";
+      uploadBtn.disabled = true;
+      statusMsg.className = "status";
+      statusMsg.textContent = "";
+
+      const fileMb = (selectedFile.size / (1024 * 1024)).toFixed(1);
+      resetProgress();
+      progressDetail.textContent = t("uploading", fileMb);
+
+      const form = new FormData();
+      form.append("file", selectedFile);
+
+      try {
+        const res = await fetch(
+          `/api/v1/health/upload/stream?user_id=${encodeURIComponent(userId)}`,
+          { method: "POST", body: form },
+        );
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalResult = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line);
+            if (event.type === "progress") {
+              updateProgress(event);
+            } else if (event.type === "done") {
+              finalResult = event.result;
+            } else if (event.type === "error") {
+              throw new Error(event.detail);
+            }
+          }
+        }
+
+        if (buffer.trim()) {
+          const event = JSON.parse(buffer);
+          if (event.type === "done") finalResult = event.result;
+          if (event.type === "error") throw new Error(event.detail);
+        }
+
+        if (!finalResult) throw new Error("No result returned from server.");
+
+        statusMsg.className = "status ok";
+        statusMsg.textContent = t("success", finalResult.days_parsed);
+        resultsCard.hidden = false;
+        renderResults(finalResult);
+      } catch (err) {
+        statusMsg.className = "status error";
+        statusMsg.textContent = "❌ " + err.message;
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    applyTheme();
+    applyLang();
+  </script>
+</body>
+</html>
