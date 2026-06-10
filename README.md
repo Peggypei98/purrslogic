@@ -14,7 +14,7 @@ A proactive wellness AI agent that triages your Google Calendar against a physio
 4. **Detects** energy overload and ranks micro-recovery options (pet cats, SLU walk, breathing, etc.)
 5. **Reasons** via Gemini 2.5 Flash with multi-turn tool calling:
    - **Short-term memory** — Arize Phoenix trace introspection
-   - **Long-term memory** — MongoDB Atlas Vector Search RAG (`text-embedding-004`)
+   - **Long-term memory** — MongoDB Atlas Vector Search via **official MongoDB MCP Server**
    - **Calendar actions** — insert / delete events (stub in demo mode)
 
 ---
@@ -26,8 +26,9 @@ Google Calendar ──► Classifier (5D matrix) ──► Energy Triage
                                                     │
 Apple Watch / BQ ──► Health Budget ────────────────┤
                                                     ▼
-MongoDB (rules + RAG) ──► Gemini Agent ◄── Phoenix (traces)
+MongoDB MCP Server ──► Atlas Vector Search ──► Gemini Agent ◄── Phoenix (traces)
                               │
+MongoDB (user rules) ─────────┘
                               ▼
                     Calendar tools + Coaching report
 ```
@@ -35,9 +36,10 @@ MongoDB (rules + RAG) ──► Gemini Agent ◄── Phoenix (traces)
 | Layer | Tech |
 |-------|------|
 | API | FastAPI, Motor (async MongoDB) |
+| Agent orchestration | **Google ADK** (`google-adk` Runner + `LlmAgent`) |
 | LLM | Google Gemini 2.5 Flash + tool calling |
 | Short-term memory | Arize Phoenix + OpenInference |
-| Long-term memory | MongoDB Atlas `$vectorSearch` (768-dim embeddings) |
+| Long-term memory | MongoDB MCP Server → Atlas `$vectorSearch` (`gemini-embedding-001`, 768-dim) |
 | Calendar | Google Calendar API (read-only OAuth) |
 | Health data | BigQuery (mock budget available for demo) |
 
@@ -56,7 +58,8 @@ purrslogic/
     │   │   └── observability.py    # Phoenix instrumentation
     │   └── services/
     │       ├── gemini_service.py   # Multi-turn agent brain
-    │       ├── vector_service.py   # RAG + embeddings
+    │       ├── vector_service.py   # RAG + embeddings (queries via MCP)
+    │       ├── mongodb_mcp_service.py  # Day 18: official MongoDB MCP client
     │       ├── introspection_service.py
     │       ├── calendar_service.py
     │       ├── classifier_service.py
@@ -74,8 +77,13 @@ purrslogic/
 |--------|------|-------------|
 | `GET` | `/` | Health check |
 | `GET` | `/docs` | Swagger UI |
+| `GET` | `/health` | **Apple Health upload UI** (export zip → analyze) |
+| `POST` | `/api/v1/health/upload` | Parse export.zip / export.xml |
+| `GET` | `/api/v1/health/recovery-summary` | Latest daily recovery metrics |
 | `GET` | `/api/v1/calendar/today` | Full triage + Gemini agent loop |
-| `GET` | `/api/v1/knowledge/search?q=cat` | Test vector RAG without Gemini |
+| `GET` | `/api/v1/adk/status` | Google ADK agent configuration |
+| `GET` | `/api/v1/mcp/status` | MongoDB MCP Server connection status |
+| `GET` | `/api/v1/knowledge/search?q=cat` | Test vector RAG via MongoDB MCP |
 | `GET` | `/api/v1/calendar/onboarding-history` | Historical event titles for onboarding |
 | `POST` | `/api/v1/calendar/onboarding-submit` | Save user 5D heuristic rules to MongoDB |
 | `GET` | `/api/v1/user/profile` | Read user profile |
@@ -93,6 +101,7 @@ Use `simulate_budget=5` when your calendar cost is ~8 — this triggers `ENERGY_
 ## Prerequisites
 
 - Python 3.11+
+- **Node.js 20+** (runs `mongodb-mcp-server` via `npx`)
 - MongoDB Atlas cluster (Vector Search index required for RAG)
 - Google Gemini API key
 - Google Calendar OAuth credentials (`calendar-client-secret.json`)
@@ -173,18 +182,46 @@ uvicorn app.main:app --reload
 - [x] Gemini multi-turn tool calling loop
 - [x] Arize Phoenix LLM observability + short-term introspection
 - [x] MongoDB Atlas Vector Search RAG (long-term semantic memory)
+- [x] **Day 18:** Official MongoDB MCP Server (`aggregate` tool for vector search)
+- [x] **Day 19:** Safety guardrails — runtime block on IMMOVABLE calendar deletes
+- [x] **Day 20:** Performance tuning — model params, parallel prefetch, slim agent payloads
 - [x] Google Calendar read (today's events)
 - [x] Demo mode via `simulate_budget` query param
 
 ## Work in Progress
 
 - [ ] Real Google Calendar write (delete/insert are currently stubs)
-- [ ] Live BigQuery / Apple Watch recovery budget (mock returns `45` today)
+- [x] Apple Health zip upload UI (`/health`) + in-app parse (方案 A)
+- [ ] Auto-sync GCS → BigQuery load job (manual `gsutil` + BQ tables today)
 - [ ] OAuth write scope for calendar modifications
-- [ ] `.env.example` and one-command setup script
+- [x] Google Cloud Agent Builder via ADK (`purrslogic_agent/`)
+- [ ] Cloud Run deploy (hackathon hosted URL)
+
+### Apple Health upload (方案 A)
+
+1. Open **http://127.0.0.1:8000/health** — step-by-step iPhone export guide + zip upload UI
+2. Or CLI (same parser as before):
+
+```bash
+cd purrslogic-backend
+python scripts/parse_health.py ~/Downloads/export.zip --csv-dir ./output
+# Optional: gsutil cp output/apple_health_*.csv gs://YOUR_BUCKET/health/
+```
+
+Upload results are stored in MongoDB (`health_uploads`) and feed `/api/v1/calendar/today` energy budget automatically.
+
+### Performance tuning (Day 20)
+
+Active knobs live in `app/config/model_config.py`. Inspect at runtime:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/adk/status
+```
+
+Optional `.env` overrides: `PURRSLOGIC_TEMPERATURE`, `PURRSLOGIC_THINKING_BUDGET_OVERLOAD`, `PURRSLOGIC_PHOENIX_LIMIT`, etc.
 
 ---
 
 ## License
 
-TBD
+MIT — see [LICENSE](LICENSE).
