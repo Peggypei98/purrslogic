@@ -2,19 +2,22 @@ import datetime
 from typing import Any
 
 from google import genai
+from google.genai import types
 
 from app.config.database import db
+from app.config.model_config import VECTOR_NUM_CANDIDATES_MULTIPLIER
+from app.services.mongodb_mcp_service import mongodb_mcp
 
 DEFAULT_USER_ID = "peggy_pei_28"
 VECTOR_INDEX_NAME = "vector_index"
-EMBEDDING_MODEL = "text-embedding-004"
+EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
 
 def search_health_knowledge_base(query: str, limit: int = 2) -> list:
     """
-    [Day 17 MCP Tool] Search Peggy's curated wellness knowledge base via MongoDB Atlas Vector Search.
-    Use keywords such as 'cat', 'walk', 'recipe', or 'recovery' to retrieve semantic matches.
+    [Day 18 MCP Tool] Search wellness knowledge via MongoDB MCP Server + Atlas Vector Search.
+    Use keywords such as 'cat', 'walk', 'recipe', or 'recovery'.
     """
     raise RuntimeError(
         "search_health_knowledge_base must be invoked through MongoDBVectorSearchService"
@@ -31,10 +34,12 @@ class MongoDBVectorSearchService:
         response = self.genai_client.models.embed_content(
             model=self.embedding_model,
             contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSIONS),
         )
         return list(response.embeddings[0].values)
 
     async def seed_initial_knowledge(self, user_id: str = DEFAULT_USER_ID) -> str:
+        """Seed uses Motor directly (write path). Agent reads go through MongoDB MCP."""
         existing = await self.collection.count_documents({"user_id": user_id})
         if existing > 0:
             print(f"🌱 [Vector RAG] Knowledge base already seeded for {user_id} ({existing} docs).")
@@ -80,6 +85,35 @@ class MongoDBVectorSearchService:
         print("✅ [Vector RAG] Seeding completed!")
         return "Seeding completed."
 
+    def _build_vector_pipeline(
+        self,
+        query_vector: list[float],
+        limit: int,
+        user_id: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "$vectorSearch": {
+                    "index": VECTOR_INDEX_NAME,
+                    "path": "embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": max(limit * VECTOR_NUM_CANDIDATES_MULTIPLIER, 10),
+                    "limit": limit,
+                    "filter": {"user_id": {"$eq": user_id}},
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "title": 1,
+                    "content": 1,
+                    "category": 1,
+                    "user_id": 1,
+                    "score": {"$meta": "vectorSearchScore"},
+                }
+            },
+        ]
+
     async def search_health_knowledge_base(
         self,
         query: str,
@@ -87,40 +121,19 @@ class MongoDBVectorSearchService:
         user_id: str = DEFAULT_USER_ID,
     ) -> list[dict[str, Any]]:
         """
-        [Day 17 MCP Tool] Executes Atlas $vectorSearch for semantic wellness matches.
+        Day 18: vector search executed through the official MongoDB MCP Server `aggregate` tool.
         """
         try:
-            print(f"🔍 [Vector RAG] Searching knowledge base for: '{query}' (limit={limit})")
+            print(f"🔍 [Vector RAG] MCP search for: '{query}' (limit={limit})")
             query_vector = self._get_embedding(query)
+            pipeline = self._build_vector_pipeline(query_vector, limit, user_id)
 
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": VECTOR_INDEX_NAME,
-                        "path": "embedding",
-                        "queryVector": query_vector,
-                        "numCandidates": max(limit * 5, 10),
-                        "limit": limit,
-                        "filter": {"user_id": {"$eq": user_id}},
-                    }
-                },
-                {
-                    "$project": {
-                        "_id": 0,
-                        "embedding": 0,
-                        "title": 1,
-                        "content": 1,
-                        "category": 1,
-                        "user_id": 1,
-                        "score": {"$meta": "vectorSearchScore"},
-                    }
-                },
-            ]
-
-            cursor = self.collection.aggregate(pipeline)
-            results = await cursor.to_list(length=limit)
-            print(f"🔍 [Vector RAG] Retrieved {len(results)} semantic match(es).")
+            results = await mongodb_mcp.aggregate(
+                collection="knowledge_base",
+                pipeline=pipeline,
+            )
+            print(f"🔍 [Vector RAG] MCP retrieved {len(results)} semantic match(es).")
             return results
         except Exception as error:
-            print(f"❌ [Vector RAG] Vector search failed: {error}")
+            print(f"❌ [Vector RAG] MCP vector search failed: {error}")
             return [{"status": "error", "message": f"Vector search failed: {error}"}]

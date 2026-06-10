@@ -6,8 +6,11 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from app.config.model_config import TRIAGE_MODEL, build_generate_content_config, performance_profile
 from app.services.calendar_service import GoogleCalendarService
+from app.services.guardrail_service import guardrail_service
 from app.services.introspection_service import AgentIntrospectionService
+from app.services.triage_context import prefetch_agent_context, slim_triage_for_agent
 from app.services.vector_service import MongoDBVectorSearchService, search_health_knowledge_base
 
 load_dotenv()
@@ -19,7 +22,7 @@ _QUOTA_MARKERS = ("429", "RESOURCE_EXHAUSTED", "QUOTA")
 class PurrslogicBrainService:
     def __init__(self):
         self.client = genai.Client()
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = TRIAGE_MODEL
         self.calendar_api = GoogleCalendarService()
         self.introspection_api = AgentIntrospectionService()
         self.vector_search_api = MongoDBVectorSearchService()
@@ -59,21 +62,15 @@ class PurrslogicBrainService:
     def _create_chat(self, model_name: str, config: types.GenerateContentConfig):
         return self.client.chats.create(model=model_name, config=config)
 
-    def _build_rag_query(self, triage_data: dict) -> str:
-        interventions = triage_data.get("proactive_interventions") or []
-        titles = " ".join(item.get("title", "") for item in interventions[:2])
-        triage_summary = triage_data.get("triage_summary", {})
-        if triage_summary.get("is_overloaded_warning"):
-            return f"energy recovery micro-break cat walk recipe {titles}".strip()
-        return f"wellness balance recipe walk {titles}".strip()
-
     async def _execute_tool(self, tool_name: str, tool_args: dict[str, Any]) -> Any:
         if tool_name == "inspect_past_decisions":
             return self.introspection_api.inspect_past_decisions(**tool_args)
         if tool_name == "search_health_knowledge_base":
             return await self.vector_search_api.search_health_knowledge_base(**tool_args)
         if tool_name == "delete_calendar_event":
-            return self.calendar_api.delete_calendar_event(**tool_args)
+            return guardrail_service.guarded_delete_calendar_event(
+                event_id=tool_args["event_id"]
+            )
         if tool_name == "insert_calendar_event":
             return self.calendar_api.insert_calendar_event(**tool_args)
         return {"status": "error", "message": f"Unknown tool: {tool_name}"}
@@ -86,30 +83,23 @@ class PurrslogicBrainService:
         is_overloaded = triage_data.get("triage_summary", {}).get("is_overloaded_warning", False)
         executed_actions_log: list[dict[str, Any]] = []
 
-        print("⚙️ [Agent Execution] Prefetching inspect_past_decisions from Phoenix...")
-        past_traces = self.introspection_api.inspect_past_decisions(limit=5)
-        executed_actions_log.append({
-            "tool_invoked": "inspect_past_decisions",
-            "arguments": {"limit": 5, "source": "prefetch"},
-            "result": past_traces,
-        })
+        guardrail_service.register_agenda(triage_data.get("events", []))
 
-        rag_query = self._build_rag_query(triage_data)
-        print(f"⚙️ [Agent Execution] Prefetching search_health_knowledge_base from Atlas...")
-        rag_results = await self.vector_search_api.search_health_knowledge_base(
-            query=rag_query,
-            limit=2,
+        print("⚙️ [Agent Execution] Parallel prefetch: Phoenix + MongoDB RAG...")
+        prefetch_log, past_traces, rag_results = await prefetch_agent_context(
+            self.introspection_api,
+            self.vector_search_api,
+            triage_data,
         )
-        executed_actions_log.append({
-            "tool_invoked": "search_health_knowledge_base",
-            "arguments": {"query": rag_query, "limit": 2, "source": "prefetch"},
-            "result": rag_results,
-        })
+        executed_actions_log.extend(prefetch_log)
+
+        safety = triage_data.get("safety_guardrails", {})
+        deletable_ids = safety.get("deletable_event_ids", [])
 
         if is_overloaded:
             overload_guidance = (
                 "Energy overload detected. Use rag_knowledge_matches to craft a precise recovery block, "
-                "then MUST call insert_calendar_event and/or delete_calendar_event."
+                "then call insert_calendar_event and/or delete_calendar_event ONLY for deletable_event_ids."
             )
         else:
             overload_guidance = (
@@ -118,23 +108,26 @@ class PurrslogicBrainService:
 
         system_instruction = f"""
         You are the ultimate proactive core intelligence of 'Purrslogic'.
-        You possess Short-term memory (Phoenix traces) AND Long-term memory (MongoDB Atlas Vector Search).
+        You possess Short-term memory (Phoenix traces) AND Long-term memory (MongoDB Atlas via the official MongoDB MCP Server).
 
         YOUR FULL-STACK PROTOCOL:
         1. Read phoenix_memory_traces first. Reference concrete trace_id / action_name values in
            '### 🧠 Agent Self-Introspection Report'.
-        2. Read rag_knowledge_matches (already prefetched). Cite specific title/content in
-           '### 📚 Long-Term RAG Knowledge Retrieval'.
+        2. Read rag_knowledge_matches (prefetched via MongoDB MCP aggregate + Atlas Vector Search).
+           Cite specific title/content in '### 📚 Long-Term RAG Knowledge Retrieval'.
         3. proactive_interventions in today_telemetry are system pre-scored suggestions;
            rag_knowledge_matches provide detailed execution steps — use both together.
         4. {overload_guidance}
-        5. You may call inspect_past_decisions or search_health_knowledge_base again if you need a refresh.
+        5. SAFETY: NEVER delete IMMOVABLE events. Only delete from deletable_event_ids: {deletable_ids}.
+           protected_events in safety_guardrails are hard-blocked by runtime guardrails.
+        6. If a delete is blocked, include '### 🛡️ Safety Guardrail Report' explaining why.
+        7. You may call inspect_past_decisions or search_health_knowledge_base again if you need a refresh.
         """
 
         payload = {
             "phoenix_memory_traces": past_traces,
             "rag_knowledge_matches": rag_results,
-            "today_telemetry": triage_data,
+            "today_telemetry": slim_triage_for_agent(triage_data),
         }
         user_prompt = (
             "Analyze the verified Phoenix memory, RAG knowledge, and today's telemetry, "
@@ -159,10 +152,14 @@ class PurrslogicBrainService:
             "insert_calendar_event",
         }
 
+        gen_config = build_generate_content_config(is_overloaded)
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=tool_list,
-            temperature=0.2,
+            temperature=gen_config.temperature,
+            top_p=gen_config.top_p,
+            max_output_tokens=gen_config.max_output_tokens,
+            thinking_config=gen_config.thinking_config,
         )
 
         try:
@@ -212,6 +209,7 @@ class PurrslogicBrainService:
                 ),
                 "automated_actions_executed": executed_actions_log,
                 "model_used": self.model_name,
+                "performance_profile": performance_profile(),
             }
 
         except Exception as error:
