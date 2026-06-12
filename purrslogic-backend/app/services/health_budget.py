@@ -1,13 +1,15 @@
 """Map Apple Watch recovery metrics to Purrslogic daily energy budget."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import timedelta
 from typing import Literal
-from zoneinfo import ZoneInfo
 
-PACIFIC = ZoneInfo("America/Los_Angeles")
+from app.services.health_analytics_service import _period_summary, _rows_in_date_window
+from app.services.health_dates import parse_health_date, today_pacific_iso
 
-BudgetSource = Literal["today", "stale", "insufficient"]
+THREE_MONTH_LOOKBACK_DAYS = 90
+
+BudgetSource = Literal["today", "rolling_3_month_avg", "stale", "insufficient"]
 
 
 @dataclass
@@ -17,6 +19,7 @@ class BudgetResolution:
     source_date: str | None
     today_date_pacific: str
     recovery_row: dict | None
+    baseline_summary: dict | None = None
 
 
 def calculate_health_budget(recovery_row: dict) -> int:
@@ -56,19 +59,28 @@ def calculate_health_budget(recovery_row: dict) -> int:
     return max(30, min(55, budget))
 
 
-def today_pacific_iso() -> str:
-    return datetime.now(PACIFIC).date().isoformat()
+def _synthetic_row_from_averages(summary: dict, as_of: str) -> dict:
+    return {
+        "date": as_of,
+        "total_sleep_minutes": summary.get("avg_sleep_minutes"),
+        "deep_sleep_ratio_pct": summary.get("avg_deep_sleep_ratio_pct"),
+        "hrv_ms": summary.get("avg_hrv_ms"),
+        "resting_heart_rate_bpm": summary.get("avg_resting_heart_rate_bpm"),
+    }
 
 
 def resolve_health_budget(daily_rows: list[dict]) -> BudgetResolution:
     """
-    Pick which day's recovery metrics drive today's energy budget.
+    Pick which recovery metrics drive today's energy budget.
 
     - today: Pacific calendar day matches a daily summary row
-    - stale: no row for today; use most recent day with main sleep (>120 min)
-    - insufficient: no qualifying daily rows at all
+    - rolling_3_month_avg: no today row — use last 90 days average as baseline
+    - stale: fallback to most recent qualifying day
+    - insufficient: no usable data
     """
     today = today_pacific_iso()
+    today_date = parse_health_date(today)
+
     today_row = next((row for row in daily_rows if row.get("date") == today), None)
     if today_row:
         return BudgetResolution(
@@ -79,34 +91,55 @@ def resolve_health_budget(daily_rows: list[dict]) -> BudgetResolution:
             recovery_row=today_row,
         )
 
-    if daily_rows:
-        stale_row = daily_rows[0]
+    if not daily_rows:
         return BudgetResolution(
-            budget=calculate_health_budget(stale_row),
-            source="stale",
-            source_date=stale_row.get("date"),
+            budget=None,
+            source="insufficient",
+            source_date=None,
             today_date_pacific=today,
-            recovery_row=stale_row,
+            recovery_row=None,
         )
 
+    sorted_rows = sorted(daily_rows, key=lambda row: row["date"])
+    start_3mo = today_date - timedelta(days=THREE_MONTH_LOOKBACK_DAYS - 1)
+    window_3mo = _rows_in_date_window(sorted_rows, start_3mo, today_date)
+
+    if window_3mo:
+        summary = _period_summary(window_3mo)
+        range_label = f"{start_3mo.isoformat()}..{today}"
+        synthetic = _synthetic_row_from_averages(summary, range_label)
+        if summary.get("avg_sleep_minutes"):
+            return BudgetResolution(
+                budget=calculate_health_budget(synthetic),
+                source="rolling_3_month_avg",
+                source_date=range_label,
+                today_date_pacific=today,
+                recovery_row=synthetic,
+                baseline_summary=summary,
+            )
+
+    stale_row = sorted_rows[-1]
     return BudgetResolution(
-        budget=None,
-        source="insufficient",
-        source_date=None,
+        budget=calculate_health_budget(stale_row),
+        source="stale",
+        source_date=stale_row.get("date"),
         today_date_pacific=today,
-        recovery_row=None,
+        recovery_row=stale_row,
     )
 
 
 def budget_meta_dict(resolution: BudgetResolution) -> dict:
     """Serializable budget provenance for API / MongoDB."""
-    return {
+    meta = {
         "source": resolution.source,
         "source_date": resolution.source_date,
         "today_date_pacific": resolution.today_date_pacific,
         "is_today_data": resolution.source == "today",
         "is_fallback": resolution.source != "today",
     }
+    if resolution.baseline_summary:
+        meta["baseline_summary"] = resolution.baseline_summary
+    return meta
 
 
 def pick_today_recovery_row(daily_rows: list[dict]) -> dict | None:

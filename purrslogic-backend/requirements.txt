@@ -13,6 +13,7 @@ pydantic-settings>=2.6.0
 google-auth-oauthlib>=1.2.0
 google-api-python-client>=2.120.0
 google-api-python-client-stubs>=1.37.0
+google-cloud-storage>=2.14.0
 
 # Observability (Arize Phoenix + OpenInference)
 arize-phoenix>=17.0.0

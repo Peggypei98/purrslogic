@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any
 
@@ -15,6 +16,13 @@ from purrslogic_agent.agent import mongodb_mcp_toolset, root_agent
 load_dotenv()
 
 APP_NAME = "purrslogic"
+_OVERLOAD_MARKERS = ("503", "UNAVAILABLE", "HIGH DEMAND", "OVERLOADED")
+_MAX_RETRIES = 3
+
+
+def _is_overloaded_api(error: Exception | str) -> bool:
+    message = str(error).upper()
+    return any(marker in message for marker in _OVERLOAD_MARKERS)
 
 
 class AdkBrainService:
@@ -36,6 +44,24 @@ class AdkBrainService:
         return "".join(part.text for part in event.content.parts if part.text)
 
     async def generate_triage_coaching(self, triage_data: dict) -> dict[str, Any]:
+        last_error: dict[str, Any] | None = None
+        for attempt in range(_MAX_RETRIES):
+            result = await self._generate_triage_coaching_once(triage_data)
+            if "error" not in result:
+                return result
+            last_error = result
+            if _is_overloaded_api(result["error"]) and attempt < _MAX_RETRIES - 1:
+                wait_seconds = 2 ** attempt
+                print(
+                    f"⚠️ [ADK Brain] Model busy, retrying in {wait_seconds}s "
+                    f"(attempt {attempt + 1}/{_MAX_RETRIES})..."
+                )
+                await asyncio.sleep(wait_seconds)
+                continue
+            return result
+        return last_error or {"error": "ADK triage failed after retries.", "orchestrator": "google-adk"}
+
+    async def _generate_triage_coaching_once(self, triage_data: dict) -> dict[str, Any]:
         executed_actions_log: list[dict[str, Any]] = []
         user_id = triage_data.get("user_id", "peggy_pei_28")
 

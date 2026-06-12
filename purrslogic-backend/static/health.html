@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -164,6 +164,76 @@
       color: var(--muted);
       margin: 0 0 0.75rem;
     }
+    .wellness-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
+      margin-top: 0.35rem;
+    }
+    @media (min-width: 720px) {
+      .wellness-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    .wellness-card {
+      border-radius: 14px;
+      padding: 0.9rem 0.85rem;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .wellness-card.green {
+      border-color: #34d399;
+      background: rgba(52, 211, 153, 0.1);
+    }
+    .wellness-card.yellow {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+    }
+    .wellness-card.red {
+      border-color: #f87171;
+      background: rgba(248, 113, 113, 0.1);
+    }
+    [data-theme="light"] .wellness-card.green { background: rgba(16, 185, 129, 0.12); }
+    [data-theme="light"] .wellness-card.yellow { background: rgba(245, 158, 11, 0.12); }
+    [data-theme="light"] .wellness-card.red { background: rgba(239, 68, 68, 0.1); }
+    .wellness-card.unknown { opacity: 0.88; }
+    .wellness-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .wellness-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .wellness-light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .wellness-light.green { background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
+    .wellness-light.yellow { background: #fbbf24; box-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }
+    .wellness-light.red { background: #f87171; box-shadow: 0 0 10px rgba(248, 113, 113, 0.65); }
+    .wellness-light.unknown { background: var(--muted); box-shadow: none; }
+    .wellness-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.25;
+    }
+    .wellness-detail { font-size: 0.75rem; color: var(--muted); line-height: 1.35; }
+    .wellness-status { font-size: 0.72rem; font-weight: 700; margin-top: auto; }
+    .wellness-status.green { color: #34d399; }
+    .wellness-status.yellow { color: #fbbf24; }
+    .wellness-status.red { color: #f87171; }
+    .wellness-status.unknown { color: var(--muted); }
     .budget-source {
       font-size: 0.88rem;
       margin: 0.5rem 0 1rem;
@@ -184,6 +254,69 @@
     tr.row-source { background: rgba(52, 211, 153, 0.08); }
     [data-theme="light"] tr.row-source { background: rgba(16, 185, 129, 0.1); }
     tr.row-today { outline: 1px solid var(--accent-dim); }
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+    .analytics-box {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+    }
+    .analytics-box strong {
+      display: block;
+      font-size: 1.05rem;
+      color: var(--accent);
+      margin-bottom: 0.2rem;
+    }
+    .analytics-box small { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+    .section-title {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 1.25rem 0 0.5rem;
+    }
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.5rem; }
+    .mini-table th, .mini-table td { padding: 0.35rem 0.3rem; border-bottom: 1px solid var(--border); }
+    .triage-status {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .triage-status.ok { background: var(--pill-bg); color: var(--accent); }
+    .triage-status.warn { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
+    .agent-report {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      max-height: 320px;
+      overflow-y: auto;
+      margin-top: 0.75rem;
+    }
+    .triage-meta { font-size: 0.85rem; color: var(--muted); margin: 0.5rem 0; }
+    button.secondary {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    button.secondary:disabled { opacity: 0.5; }
+    .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; font-size: 0.85rem; color: var(--muted); }
     #progressPanel { margin-top: 1rem; }
     .progress-bar-wrap {
       height: 8px;
@@ -241,8 +374,8 @@
   <div class="wrap">
     <div class="toolbar">
       <div class="toggle-group" id="langToggle" role="group" aria-label="Language">
-        <button type="button" class="toggle-btn active" data-lang="zh">中文</button>
-        <button type="button" class="toggle-btn" data-lang="en">EN</button>
+        <button type="button" class="toggle-btn" data-lang="zh">中文</button>
+        <button type="button" class="toggle-btn active" data-lang="en">EN</button>
       </div>
       <div class="toggle-group" id="themeToggle" role="group" aria-label="Theme">
         <button type="button" class="toggle-btn active" data-theme="dark" data-i18n="themeDark">夜間</button>
@@ -251,24 +384,35 @@
     </div>
 
     <h1 data-i18n="title">🐱 Purrslogic Health Upload</h1>
-    <p class="sub" data-i18n="subtitle">從 iPhone 匯出 Apple Health → 上傳 zip → 自動分析今日能量預算</p>
+    <p class="sub" data-i18n="subtitle">Export Apple Health from iPhone → upload zip → auto-compute today's energy budget</p>
 
     <div class="card" style="margin-top: 2rem;">
-      <h2 data-i18n="step1Title">Step 1 · iPhone 匯出</h2>
+      <h2 data-i18n="step1Title">Step 1 · Export on iPhone</h2>
+      <p class="counts-subtitle" data-i18n="step1Intro">Follow these steps to export your data:</p>
       <ol class="steps">
         <li data-i18n="step1_1"></li>
         <li data-i18n="step1_2"></li>
         <li data-i18n="step1_3"></li>
         <li data-i18n="step1_4"></li>
+        <li data-i18n="step1_5"></li>
       </ol>
       <p class="warn-note" data-i18n="privacyNote"></p>
     </div>
 
     <div class="card">
       <h2 data-i18n="step2Title">Step 2 · 上傳並分析</h2>
-      <label class="field" for="userId" data-i18n="userIdLabel">User ID</label>
-      <input type="text" id="userId" value="peggy_pei_28" />
+      <label class="field" for="userId" data-i18n="userIdLabel">Your Purrslogic ID</label>
+      <input type="text" id="userId" />
+      <p class="counts-subtitle" data-i18n="userIdHint">自動產生唯一 ID，健康資料與 Calendar 都會綁定這個 ID（存在本機瀏覽器）</p>
 
+      <div class="budget-source" id="calendarOAuthBox">
+        <strong data-i18n="calendarConnectTitle">Google Calendar</strong>
+        <p id="calendarOAuthStatus" style="margin:0.35rem 0;font-size:0.85rem;"></p>
+        <button type="button" class="secondary" id="connectCalendarBtn" data-i18n="calendarConnectBtn">Connect Google Calendar</button>
+        <button type="button" class="secondary" id="disconnectCalendarBtn" hidden data-i18n="calendarDisconnectBtn">Disconnect</button>
+      </div>
+
+      <label class="field" for="fileInput" style="margin-top:1rem;" data-i18n="uploadFileLabel">Apple Health export</label>
       <div class="drop" id="dropZone">
         <input type="file" id="fileInput" accept=".zip,.xml" />
         <div data-i18n="dropMain">📦 拖放 <strong>export.zip</strong> 到這裡</div>
@@ -300,9 +444,9 @@
         <span class="budget-pill" id="budget">—</span>
       </p>
       <div class="budget-source" id="budgetSourceNote" hidden></div>
-      <p class="counts-subtitle" data-i18n="countsSubtitle">Export 歷史總筆數（整份 zip，非今日）</p>
-      <div class="counts" id="counts"></div>
-      <p class="table-caption" data-i18n="dailyTableCaption">每日恢復指標（Pacific，主睡眠 &gt; 120 分鐘，最近 14 天）</p>
+      <p class="counts-subtitle" data-i18n="wellnessSubtitle">Last 30 days at a glance</p>
+      <div class="wellness-grid" id="wellnessScores"></div>
+      <p class="table-caption" data-i18n="dailyTableCaption">Daily recovery (Pacific, main sleep &gt; 120 min, last 14 days)</p>
       <table>
         <thead>
           <tr>
@@ -315,11 +459,54 @@
         </thead>
         <tbody id="summaryBody"></tbody>
       </table>
-      <p class="footer-note">
-        <span data-i18n="footerPrefix">完成後可呼叫</span>
-        <a href="/docs#/default/get_today_calendar_api_v1_calendar_today_get" target="_blank">/api/v1/calendar/today</a>
-        <span data-i18n="footerSuffix">進行日曆能量 triage（會使用剛上傳的 budget）。</span>
-      </p>
+
+      <div id="analyticsDetail" hidden>
+      <p class="section-title" data-i18n="analyticsTitle">你的健康概況（Export 歷史）</p>
+      <p class="counts-subtitle" id="exportRangeText"></p>
+      <div class="analytics-grid" id="analyticsGrid"></div>
+      <p class="section-title" data-i18n="monthlyTitle">每月平均（最近 12 個月）</p>
+      <table class="mini-table">
+        <thead>
+          <tr>
+            <th data-i18n="colMonth">月份</th>
+            <th data-i18n="colSleep">睡眠</th>
+            <th data-i18n="colDeep">深睡%</th>
+            <th data-i18n="colHrv">HRV</th>
+          </tr>
+        </thead>
+        <tbody id="monthlyBody"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card" id="triageCard" hidden>
+      <h2 data-i18n="step4Title">Step 4 · 日曆能量 Triage</h2>
+      <p class="counts-subtitle" data-i18n="step4Hint">使用剛上傳的 health budget + Google Calendar 今日行程，執行 ADK agent 分析。</p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="simulateOverload" />
+        <span data-i18n="simulateLabel">Demo：simulate_budget=5 強制 overload</span>
+      </label>
+      <button class="primary" id="triageBtn" data-i18n="triageBtn">Run Calendar Triage</button>
+
+      <div id="triageProgressPanel" hidden>
+        <div class="progress-head">
+          <span id="triageProgressLabel">—</span>
+          <strong id="triageProgressPercent">0%</strong>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="triageProgressBar"></div>
+        </div>
+        <div class="progress-detail" id="triageProgressDetail"></div>
+        <p class="counts-subtitle" id="triageElapsed"></p>
+        <ul class="stage-list" id="triageStageList"></ul>
+      </div>
+
+      <div class="status" id="triageStatus"></div>
+      <div id="triageResults" hidden>
+        <span class="triage-status" id="triageStatusBadge"></span>
+        <div class="triage-meta" id="triageMeta"></div>
+        <div class="agent-report" id="agentReport"></div>
+      </div>
     </div>
   </div>
 
@@ -332,19 +519,33 @@
         themeDark: "夜間",
         themeLight: "白天",
         step1Title: "Step 1 · iPhone 匯出",
-        step1_1: "打開 <strong>設定 → 健康 → 資料輸出與存取</strong>",
-        step1_2: "點 <strong>輸出所有健康資料</strong>（Export All Health Data）",
-        step1_3: "等待產生 <strong>export.zip</strong>（檔案可能很大，需幾分鐘）",
-        step1_4: "用 AirDrop / iCloud / 傳到 Mac 或直接在 Safari 上傳此頁",
+        step1Intro: "請依下列步驟匯出健康資料：",
+        step1_1: "打開 iPhone 上的 <strong>健康</strong> App",
+        step1_2: "在 <strong>摘要</strong> 分頁右上角，點你的 <strong>個人照片或縮寫</strong>",
+        step1_3: "滑到選單最底部，選 <strong>輸出所有健康資料</strong>（Export All Health Data）",
+        step1_4: "點 <strong>輸出</strong> 確認",
+        step1_5: "等待匯出完成；出現分享選單時，選 <strong>儲存到檔案</strong>、AirDrop 或 email",
         privacyNote: "⚠️ 僅上傳給 Purrslogic 分析，不會寫入 Apple。建議在信任的網路環境操作。",
         step2Title: "Step 2 · 上傳並分析",
-        userIdLabel: "User ID",
+        userIdLabel: "你的 Purrslogic ID",
+        userIdHint: "自動產生唯一 ID；健康資料與 Google Calendar 都綁定此 ID（存在本機瀏覽器）",
+        uploadFileLabel: "Apple Health 匯出檔",
+        calendarConnectTitle: "Google Calendar",
+        calendarConnectBtn: "連接 Google Calendar",
+        calendarDisconnectBtn: "中斷 Calendar 連線",
+        calendarConnected: "✓ 已連接 Google Calendar",
+        calendarDisconnected: "尚未連接 — Triage 需要讀取你的日曆",
+        calendarConnectHint: "會跳轉 Google 授權，僅請求日曆讀取權限",
+        budgetSource3Month: "⚠ 今日無資料 — budget 使用<strong>過去 3 個月平均</strong>（{range}，{days} 天）",
         dropMain: "📦 拖放 <strong>export.zip</strong> 到這裡",
         dropHint: "或點擊選擇檔案（也支援 export.xml）",
         uploadBtn: "上傳並分析",
         uploading: (mb) => `上傳中… ${mb} MB`,
         success: (n) => `✅ 成功解析 ${n} 天資料`,
         stageUploading: "上傳檔案",
+        stageGcsUpload: "上傳至 Cloud Storage（大檔案）",
+        error413: "檔案超過 Cloud Run 32MB 限制，改走 Cloud Storage 上傳…",
+        errorStreamLost: "伺服器在完成前中斷（timeout 或記憶體不足）。請再試一次，大檔案可能需要 5–10 分鐘。",
         stageReceived: "檔案已接收",
         stageExtracting: "解壓縮 export.zip",
         stagePreprocessing: "清理 XML 格式",
@@ -361,6 +562,16 @@
         budgetSourceStale: "⚠ 今日無合格睡眠資料，budget 來自最近一天：<strong>{date}</strong>（非今日）",
         budgetInsufficient: "✗ 無足夠睡眠資料，無法估算 energy budget",
         countsSubtitle: "Export 歷史總筆數（整份 zip，非今日）",
+        wellnessSubtitle: "近 30 天健康概況（紅 / 黃 / 綠評分）",
+        scoreSleep: "睡眠",
+        scoreVitals: "生理指標",
+        scoreActivity: "運動",
+        scoreMobility: "行動力",
+        scoreGreat: "很棒",
+        scoreOk: "還可以",
+        scoreNeedsWork: "需改善",
+        scoreUnknown: "資料不足",
+        wellnessDaysNote: (n) => `近 ${n} 天平均`,
         dailyTableCaption: "每日恢復指標（Pacific，主睡眠 > 120 分鐘，最近 14 天）",
         colDate: "日期",
         colSleep: "睡眠(分)",
@@ -371,8 +582,42 @@
         countSleep: "睡眠",
         countActivity: "活動",
         countMobility: "行動",
-        footerPrefix: "完成後可呼叫",
-        footerSuffix: "進行日曆能量 triage（會使用剛上傳的 budget）。",
+        analyticsTitle: "你的健康概況（Export 歷史）",
+        exportRange: (from, to, days) => `資料範圍：<strong>${from}</strong> → <strong>${to}</strong>（${days} 天有主睡眠）`,
+        rolling7Label: "近 7 天平均",
+        rolling30Label: "近 30 天平均",
+        recent7Label: "最近 7 天平均",
+        recent30Label: "最近 30 天平均",
+        rollingFallbackNote: "（日曆視窗無資料，改用最後 N 天）",
+        statSleep: "睡眠",
+        statDeep: "深睡",
+        statHrv: "HRV",
+        statRhr: "靜息心率",
+        statDays: "天",
+        monthlyTitle: "每月平均（最近 12 個月）",
+        colMonth: "月份",
+        step4Title: "Step 4 · 日曆能量 Triage",
+        step4Hint: "使用剛上傳的 health budget + Google Calendar 今日行程，執行 ADK agent 分析。",
+        simulateLabel: "Demo：simulate_budget=5 強制 overload",
+        triageBtn: "執行日曆 Triage",
+        triageRunning: "Agent 分析中…可能需要 1–2 分鐘（ADK + Gemini + MCP）",
+        triageElapsed: (s) => `已執行 ${s} 秒`,
+        triageRetry503: "Gemini 暫時過載 (503)，請等 1 分鐘後再按一次 Run Calendar Triage",
+        triageError: "Triage 失敗",
+        triageHealthy: "HEALTHY_BALANCED",
+        triageOverload: "ENERGY_OVERLOAD",
+        triageMeta: (budget, cost, remaining, source) =>
+          `Budget ${budget} · 行程消耗 ${cost} · 剩餘 ${remaining}${source ? ` · 來源：${source}` : ""}`,
+        triageStageProfile: "讀取使用者設定",
+        triageStageCalendar: "抓取 Google Calendar",
+        triageStageClassify: "行程分類（5D 能量矩陣）",
+        triageStageBudget: "計算 health budget",
+        triageStageGuardrails: "安全 guardrails",
+        triageStagePrefetch: "Prefetch Phoenix + RAG",
+        triageStageAgent: "ADK Agent（Gemini + MCP）",
+        triageStageFallback: "備援：legacy Gemini",
+        triageStageComplete: "完成",
+        noMonthly: "尚無月度資料",
       },
       en: {
         pageTitle: "Purrslogic · Apple Health Upload",
@@ -381,19 +626,33 @@
         themeDark: "Dark",
         themeLight: "Light",
         step1Title: "Step 1 · Export on iPhone",
-        step1_1: "Open <strong>Settings → Health → Data Export & Access</strong>",
-        step1_2: "Tap <strong>Export All Health Data</strong>",
-        step1_3: "Wait for <strong>export.zip</strong> (large file — may take several minutes)",
-        step1_4: "AirDrop / iCloud to Mac, or upload directly from Safari on this page",
+        step1Intro: "Follow these steps to export your data:",
+        step1_1: "Open the <strong>Health</strong> app on your iPhone.",
+        step1_2: "Tap your <strong>Profile icon or initials</strong> in the top right corner of the <strong>Summary</strong> tab.",
+        step1_3: "Scroll to the very bottom of the menu and select <strong>Export All Health Data</strong>.",
+        step1_4: "Tap <strong>Export</strong> to confirm.",
+        step1_5: "Wait for the export to compile. When the Share Sheet appears, select <strong>Save to Files</strong>, AirDrop, or email it.",
         privacyNote: "⚠️ Data is sent only to Purrslogic for analysis — not written back to Apple. Use a trusted network.",
         step2Title: "Step 2 · Upload & Analyze",
-        userIdLabel: "User ID",
+        userIdLabel: "Your Purrslogic ID",
+        userIdHint: "Auto-generated unique ID; health data and Google Calendar link to it (stored in this browser)",
+        uploadFileLabel: "Apple Health export file",
+        calendarConnectTitle: "Google Calendar",
+        calendarConnectBtn: "Connect Google Calendar",
+        calendarDisconnectBtn: "Disconnect Calendar",
+        calendarConnected: "✓ Google Calendar connected",
+        calendarDisconnected: "Not connected — triage needs calendar read access",
+        calendarConnectHint: "Redirects to Google OAuth (calendar read-only scope)",
+        budgetSource3Month: "⚠ No data for today — budget uses <strong>3-month average</strong> ({range}, {days} days)",
         dropMain: "📦 Drop <strong>export.zip</strong> here",
         dropHint: "Or click to choose a file (export.xml also supported)",
         uploadBtn: "Upload & Analyze",
         uploading: (mb) => `Uploading… ${mb} MB`,
         success: (n) => `✅ Parsed ${n} day(s) of data`,
         stageUploading: "Uploading file",
+        stageGcsUpload: "Uploading to Cloud Storage (large file)",
+        error413: "File exceeds Cloud Run 32 MB limit — using Cloud Storage upload…",
+        errorStreamLost: "Server stopped before finishing (timeout or memory). Please retry — large exports may take 5–10 minutes.",
         stageReceived: "File received",
         stageExtracting: "Extracting export.zip",
         stagePreprocessing: "Cleaning XML",
@@ -410,6 +669,16 @@
         budgetSourceStale: "⚠ No qualifying sleep for today — budget from most recent day: <strong>{date}</strong> (not today)",
         budgetInsufficient: "✗ Insufficient sleep data — cannot estimate energy budget",
         countsSubtitle: "Lifetime record counts in this export (not today only)",
+        wellnessSubtitle: "Last 30 days at a glance (red / yellow / green)",
+        scoreSleep: "Sleep",
+        scoreVitals: "Vitals",
+        scoreActivity: "Activity",
+        scoreMobility: "Mobility",
+        scoreGreat: "Great",
+        scoreOk: "OK",
+        scoreNeedsWork: "Needs work",
+        scoreUnknown: "Not enough data",
+        wellnessDaysNote: (n) => `${n}-day avg`,
         dailyTableCaption: "Daily recovery (Pacific, main sleep > 120 min, last 14 days)",
         colDate: "Date",
         colSleep: "Sleep (min)",
@@ -420,19 +689,54 @@
         countSleep: "Sleep",
         countActivity: "Activity",
         countMobility: "Mobility",
-        footerPrefix: "Then call",
-        footerSuffix: "for calendar energy triage (uses the budget you just uploaded).",
+        analyticsTitle: "Your health profile (export history)",
+        exportRange: (from, to, days) => `Data range: <strong>${from}</strong> → <strong>${to}</strong> (${days} days with main sleep)`,
+        rolling7Label: "Last 7 days avg",
+        rolling30Label: "Last 30 days avg",
+        recent7Label: "Most recent 7 days avg",
+        recent30Label: "Most recent 30 days avg",
+        rollingFallbackNote: "(calendar window empty — using latest N days)",
+        statSleep: "Sleep",
+        statDeep: "Deep",
+        statHrv: "HRV",
+        statRhr: "Resting HR",
+        statDays: "days",
+        monthlyTitle: "Monthly averages (last 12 months)",
+        colMonth: "Month",
+        step4Title: "Step 4 · Calendar energy triage",
+        step4Hint: "Runs ADK agent with your uploaded health budget + today's Google Calendar.",
+        simulateLabel: "Demo: simulate_budget=5 to force overload",
+        triageBtn: "Run Calendar Triage",
+        triageRunning: "Agent running… may take 1–2 min (ADK + Gemini + MCP)",
+        triageElapsed: (s) => `Running ${s}s`,
+        triageRetry503: "Gemini temporarily overloaded (503). Wait ~1 minute and click Run Calendar Triage again.",
+        triageError: "Triage failed",
+        triageHealthy: "HEALTHY_BALANCED",
+        triageOverload: "ENERGY_OVERLOAD",
+        triageMeta: (budget, cost, remaining, source) =>
+          `Budget ${budget} · agenda cost ${cost} · remaining ${remaining}${source ? ` · source: ${source}` : ""}`,
+        triageStageProfile: "Loading profile",
+        triageStageCalendar: "Fetching Google Calendar",
+        triageStageClassify: "Classifying events (5D matrix)",
+        triageStageBudget: "Resolving health budget",
+        triageStageGuardrails: "Applying safety guardrails",
+        triageStagePrefetch: "Prefetch Phoenix + RAG",
+        triageStageAgent: "Running ADK agent (Gemini + MCP)",
+        triageStageFallback: "Fallback: legacy Gemini loop",
+        triageStageComplete: "Complete",
+        noMonthly: "No monthly data yet",
       },
     };
 
-    const COUNT_KEYS = [
-      ["vitals", "countVitals"],
-      ["sleep", "countSleep"],
-      ["activity", "countActivity"],
-      ["mobility", "countMobility"],
+    const WELLNESS_KEYS = [
+      ["sleep", "scoreSleep"],
+      ["vitals", "scoreVitals"],
+      ["activity", "scoreActivity"],
+      ["mobility", "scoreMobility"],
     ];
 
     const STAGE_ORDER = [
+      "gcs_upload",
       "uploading",
       "received",
       "extracting_zip",
@@ -444,7 +748,20 @@
       "complete",
     ];
 
+    const TRIAGE_STAGE_ORDER = [
+      "profile",
+      "calendar",
+      "classify",
+      "budget",
+      "guardrails",
+      "prefetch",
+      "agent",
+      "fallback",
+      "complete",
+    ];
+
     const STAGE_I18N = {
+      gcs_upload: "stageGcsUpload",
       uploading: "stageUploading",
       received: "stageReceived",
       extracting_zip: "stageExtracting",
@@ -456,7 +773,22 @@
       complete: "stageComplete",
     };
 
-    let lang = localStorage.getItem("purrslogic-lang") || "zh";
+    const TRIAGE_STAGE_I18N = {
+      profile: "triageStageProfile",
+      calendar: "triageStageCalendar",
+      classify: "triageStageClassify",
+      budget: "triageStageBudget",
+      guardrails: "triageStageGuardrails",
+      prefetch: "triageStagePrefetch",
+      agent: "triageStageAgent",
+      fallback: "triageStageFallback",
+      complete: "triageStageComplete",
+    };
+
+    const CLOUD_UPLOAD_LIMIT_BYTES = 28 * 1024 * 1024;
+    const isCloudHost = () => window.location.hostname.includes("run.app");
+
+    let lang = localStorage.getItem("purrslogic-lang") || "en";
     let theme = localStorage.getItem("purrslogic-theme") || "dark";
     let selectedFile = null;
     let lastResult = null;
@@ -502,14 +834,129 @@
       });
 
       uploadBtn.textContent = t("uploadBtn");
+      document.getElementById("triageBtn").textContent = t("triageBtn");
+      document.getElementById("connectCalendarBtn").textContent = t("calendarConnectBtn");
+      document.getElementById("disconnectCalendarBtn").textContent = t("calendarDisconnectBtn");
       if (lastResult) renderResults(lastResult);
-      if (!progressPanel.hidden) renderStageList(currentStage, completedStages);
+      refreshCalendarStatus();
       localStorage.setItem("purrslogic-lang", lang);
     }
 
     function stageLabel(stage) {
       const key = STAGE_I18N[stage];
       return key ? t(key) : stage;
+    }
+
+    function triageStageLabel(stage) {
+      const key = TRIAGE_STAGE_I18N[stage];
+      return key ? t(key) : stage;
+    }
+
+    let triageCurrentStage = "";
+    let triageCompletedStages = new Set();
+    let triageTimerId = null;
+
+    function renderTriageStageList(activeStage, doneSet) {
+      const list = document.getElementById("triageStageList");
+      const activeIdx = TRIAGE_STAGE_ORDER.indexOf(activeStage);
+      list.innerHTML = TRIAGE_STAGE_ORDER.filter((s) => s !== "fallback" || doneSet.has("fallback")).map((stage, idx) => {
+        let state = "pending";
+        let icon = "○";
+        if (doneSet.has(stage) || idx < activeIdx) {
+          state = "done";
+          icon = "✓";
+        } else if (stage === activeStage) {
+          state = "active";
+          icon = "●";
+        }
+        return `<li class="stage-item ${state}"><span class="stage-icon">${icon}</span><span>${triageStageLabel(stage)}</span></li>`;
+      }).join("");
+    }
+
+    function updateTriageProgress(event) {
+      const stage = event.stage || triageCurrentStage;
+      const percent = event.percent ?? 0;
+
+      if (triageCurrentStage && triageCurrentStage !== stage) {
+        triageCompletedStages.add(triageCurrentStage);
+      }
+      triageCurrentStage = stage;
+      if (stage === "complete") {
+        TRIAGE_STAGE_ORDER.forEach((s) => triageCompletedStages.add(s));
+      }
+      if (stage === "fallback") {
+        triageCompletedStages.add("fallback");
+      }
+
+      document.getElementById("triageProgressPanel").hidden = false;
+      document.getElementById("triageProgressBar").style.width = `${percent}%`;
+      document.getElementById("triageProgressPercent").textContent = `${percent}%`;
+      document.getElementById("triageProgressLabel").textContent = triageStageLabel(stage);
+      renderTriageStageList(stage, triageCompletedStages);
+
+      const detailEl = document.getElementById("triageProgressDetail");
+      if (event.event_count != null) {
+        detailEl.textContent = lang === "zh"
+          ? `今日 ${event.event_count} 個行程`
+          : `${event.event_count} events today`;
+      } else if (event.detail) {
+        detailEl.textContent = event.detail;
+      }
+    }
+
+    function resetTriageProgress() {
+      triageCurrentStage = "profile";
+      triageCompletedStages = new Set();
+      document.getElementById("triageProgressBar").style.width = "0%";
+      document.getElementById("triageProgressPercent").textContent = "0%";
+      document.getElementById("triageProgressLabel").textContent = triageStageLabel("profile");
+      document.getElementById("triageProgressDetail").textContent = "";
+      document.getElementById("triageElapsed").textContent = "";
+      renderTriageStageList("profile", triageCompletedStages);
+      document.getElementById("triageProgressPanel").hidden = false;
+    }
+
+    function startTriageTimer() {
+      const start = Date.now();
+      if (triageTimerId) clearInterval(triageTimerId);
+      triageTimerId = setInterval(() => {
+        const secs = Math.floor((Date.now() - start) / 1000);
+        document.getElementById("triageElapsed").textContent = t("triageElapsed", secs);
+      }, 1000);
+    }
+
+    function stopTriageTimer() {
+      if (triageTimerId) {
+        clearInterval(triageTimerId);
+        triageTimerId = null;
+      }
+    }
+
+    function renderTriageResults(data) {
+      const triageResults = document.getElementById("triageResults");
+      const summary = data.triage_summary || {};
+      const badge = document.getElementById("triageStatusBadge");
+      const isOverload = summary.is_overloaded_warning;
+      badge.textContent = isOverload ? t("triageOverload") : t("triageHealthy");
+      badge.className = `triage-status ${isOverload ? "warn" : "ok"}`;
+
+      const bMeta = summary.budget_meta || {};
+      let sourceLabel = bMeta.source || "";
+      if (bMeta.source === "today") sourceLabel = lang === "zh" ? "今日" : "today";
+      if (bMeta.source === "rolling_3_month_avg") sourceLabel = lang === "zh" ? "3個月平均" : "3mo avg";
+
+      document.getElementById("triageMeta").textContent = t(
+        "triageMeta",
+        summary.physiological_budget,
+        summary.total_agenda_cost_burn,
+        summary.remaining_net_energy,
+        sourceLabel,
+      );
+
+      document.getElementById("agentReport").textContent =
+        data.agent_decision_center || "(no agent text)";
+
+      triageResults.hidden = false;
     }
 
     function renderStageList(activeStage, doneSet) {
@@ -591,6 +1038,13 @@
       if (meta.source === "today") {
         noteEl.classList.add("ok");
         noteEl.innerHTML = t("budgetSourceToday", { date: meta.source_date || meta.today_date_pacific });
+      } else if (meta.source === "rolling_3_month_avg") {
+        noteEl.classList.add("warn");
+        const summary = meta.baseline_summary || {};
+        noteEl.innerHTML = t("budgetSource3Month", {
+          range: meta.source_date || "",
+          days: summary.days || "—",
+        });
       } else if (meta.source === "stale") {
         noteEl.classList.add("warn");
         noteEl.innerHTML = t("budgetSourceStale", { date: meta.source_date || "?" });
@@ -599,10 +1053,7 @@
         noteEl.innerHTML = t("budgetInsufficient");
       }
 
-      const counts = data.record_counts || {};
-      document.getElementById("counts").innerHTML = COUNT_KEYS.map(([k, labelKey]) =>
-        `<div class="count-box"><span>${(counts[k] || 0).toLocaleString()}</span><small>${t(labelKey)}</small></div>`
-      ).join("");
+      renderWellnessScores(data.wellness_scores || data.health_analytics?.wellness_scores);
 
       const sourceDate = meta.source_date;
       const todayPacific = meta.today_date_pacific;
@@ -619,7 +1070,184 @@
           <td>${row.resting_heart_rate_bpm ?? "—"}</td>
         </tr>`;
       }).join("");
+
+      renderAnalytics(data.health_analytics, meta);
+      document.getElementById("triageCard").hidden = false;
     }
+
+    function wellnessStatusLabel(level) {
+      if (level === "green") return t("scoreGreat");
+      if (level === "yellow") return t("scoreOk");
+      if (level === "red") return t("scoreNeedsWork");
+      return t("scoreUnknown");
+    }
+
+    function renderWellnessScores(scores) {
+      const el = document.getElementById("wellnessScores");
+      const categories = scores?.categories || {};
+      el.innerHTML = WELLNESS_KEYS.map(([key, labelKey]) => {
+        const cat = categories[key] || {};
+        const level = cat.level || "unknown";
+        const days = cat.days || scores?.period_days || 0;
+        return `
+          <div class="wellness-card ${level}">
+            <div class="wellness-head">
+              <span class="wellness-label">${t(labelKey)}</span>
+              <span class="wellness-light ${level}" aria-hidden="true"></span>
+            </div>
+            <div class="wellness-value">${cat.headline || "—"}</div>
+            <div class="wellness-detail">${cat.detail || ""}${days ? ` · ${t("wellnessDaysNote", days)}` : ""}</div>
+            <div class="wellness-status ${level}">${wellnessStatusLabel(level)}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function fmtHours(minutes) {
+      if (minutes == null) return "—";
+      return `${(minutes / 60).toFixed(1)}h`;
+    }
+
+    function fmtVal(val, suffix = "") {
+      if (val == null) return "—";
+      return `${val}${suffix}`;
+    }
+
+    function rollingBox(label, period, isFallback) {
+      if (!period || !period.days) return "";
+      const note = isFallback ? `<br/><span>${t("rollingFallbackNote")}</span>` : "";
+      return `
+        <div class="analytics-box">
+          <small>${label}${note}</small>
+          <strong>${fmtHours(period.avg_sleep_minutes)}</strong>
+          <small>${t("statDeep")} ${fmtVal(period.avg_deep_sleep_ratio_pct, "%")} · ${t("statHrv")} ${fmtVal(period.avg_hrv_ms)}<br/>
+          ${t("statRhr")} ${fmtVal(period.avg_resting_heart_rate_bpm)} · ${period.days} ${t("statDays")}</small>
+        </div>`;
+    }
+
+    function renderAnalytics(analytics) {
+      const grid = document.getElementById("analyticsGrid");
+      const rangeEl = document.getElementById("exportRangeText");
+      const monthlyBody = document.getElementById("monthlyBody");
+
+      if (!analytics || !analytics.export_range) {
+        rangeEl.innerHTML = "";
+        grid.innerHTML = "";
+        monthlyBody.innerHTML = `<tr><td colspan="4">${t("noMonthly")}</td></tr>`;
+        return;
+      }
+
+      const range = analytics.export_range;
+      rangeEl.innerHTML = t(
+        "exportRange",
+        range.earliest_date,
+        range.latest_date,
+        range.days_with_main_sleep,
+      );
+
+      const rolling = analytics.rolling || {};
+      const useRecent7 = !rolling.last_7_days?.days && rolling.recent_7_days?.days;
+      const useRecent30 = !rolling.last_30_days?.days && rolling.recent_30_days?.days;
+
+      grid.innerHTML = [
+        rollingBox(
+          useRecent7 ? t("recent7Label") : t("rolling7Label"),
+          useRecent7 ? rolling.recent_7_days : rolling.last_7_days,
+          useRecent7,
+        ),
+        rollingBox(
+          useRecent30 ? t("recent30Label") : t("rolling30Label"),
+          useRecent30 ? rolling.recent_30_days : rolling.last_30_days,
+          useRecent30,
+        ),
+      ].join("");
+
+      const months = (analytics.monthly || []).slice(0, 6);
+      monthlyBody.innerHTML = months.length
+        ? months.map((m) => `
+          <tr>
+            <td>${m.month}</td>
+            <td>${fmtHours(m.avg_sleep_minutes)}</td>
+            <td>${fmtVal(m.avg_deep_sleep_ratio_pct, "%")}</td>
+            <td>${fmtVal(m.avg_hrv_ms)}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="4">${t("noMonthly")}</td></tr>`;
+    }
+
+    document.getElementById("triageBtn").addEventListener("click", async () => {
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) {
+        statusMsg.className = "status error";
+        statusMsg.textContent = lang === "zh" ? "請先設定 Purrslogic ID" : "Set your Purrslogic ID first";
+        return;
+      }
+      const simulate = document.getElementById("simulateOverload").checked;
+      const triageBtn = document.getElementById("triageBtn");
+      const triageStatus = document.getElementById("triageStatus");
+
+      triageBtn.disabled = true;
+      triageStatus.className = "status";
+      triageStatus.textContent = t("triageRunning");
+      document.getElementById("triageResults").hidden = true;
+      resetTriageProgress();
+      startTriageTimer();
+
+      let url = `/api/v1/calendar/today/stream?user_id=${encodeURIComponent(userId)}`;
+      if (simulate) url += "&simulate_budget=5";
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalResult = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line);
+            if (event.type === "progress") {
+              updateTriageProgress(event);
+            } else if (event.type === "done") {
+              finalResult = event.result;
+            } else if (event.type === "error") {
+              throw new Error(event.detail);
+            }
+          }
+        }
+
+        if (buffer.trim()) {
+          const event = JSON.parse(buffer);
+          if (event.type === "done") finalResult = event.result;
+          if (event.type === "error") throw new Error(event.detail);
+        }
+
+        if (!finalResult) throw new Error("No triage result returned.");
+
+        renderTriageResults(finalResult);
+        triageStatus.className = "status ok";
+        triageStatus.textContent = "✓";
+      } catch (err) {
+        triageStatus.className = "status error";
+        const is503 = String(err.message).includes("503") || String(err.message).toLowerCase().includes("overloaded");
+        triageStatus.textContent = is503
+          ? t("triageRetry503")
+          : `${t("triageError")}: ${err.message}`;
+      } finally {
+        stopTriageTimer();
+        triageBtn.disabled = false;
+      }
+    });
 
     document.getElementById("langToggle").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-lang]");
@@ -660,7 +1288,12 @@
 
     uploadBtn.addEventListener("click", async () => {
       if (!selectedFile) return;
-      const userId = document.getElementById("userId").value.trim() || "peggy_pei_28";
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) {
+        statusMsg.className = "status error";
+        statusMsg.textContent = lang === "zh" ? "請先設定 Purrslogic ID" : "Set your Purrslogic ID first";
+        return;
+      }
       uploadBtn.disabled = true;
       statusMsg.className = "status";
       statusMsg.textContent = "";
@@ -669,52 +1302,11 @@
       resetProgress();
       progressDetail.textContent = t("uploading", fileMb);
 
-      const form = new FormData();
-      form.append("file", selectedFile);
-
       try {
-        const res = await fetch(
-          `/api/v1/health/upload/stream?user_id=${encodeURIComponent(userId)}`,
-          { method: "POST", body: form },
-        );
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `HTTP ${res.status}`);
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let finalResult = null;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            const event = JSON.parse(line);
-            if (event.type === "progress") {
-              updateProgress(event);
-            } else if (event.type === "done") {
-              finalResult = event.result;
-            } else if (event.type === "error") {
-              throw new Error(event.detail);
-            }
-          }
-        }
-
-        if (buffer.trim()) {
-          const event = JSON.parse(buffer);
-          if (event.type === "done") finalResult = event.result;
-          if (event.type === "error") throw new Error(event.detail);
-        }
-
-        if (!finalResult) throw new Error("No result returned from server.");
+        const useGcs = isCloudHost();
+        const finalResult = useGcs
+          ? await uploadViaGcs(userId, selectedFile, fileMb)
+          : await uploadDirect(userId, selectedFile, fileMb);
 
         statusMsg.className = "status ok";
         statusMsg.textContent = t("success", finalResult.days_parsed);
@@ -728,8 +1320,177 @@
       }
     });
 
+    async function consumeUploadStream(res) {
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResult = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "progress") {
+            updateProgress(event);
+          } else if (event.type === "done") {
+            finalResult = event.result;
+          } else if (event.type === "error") {
+            throw new Error(event.detail);
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        const event = JSON.parse(buffer);
+        if (event.type === "done") finalResult = event.result;
+        if (event.type === "error") throw new Error(event.detail);
+      }
+
+      if (!finalResult) throw new Error(t("errorStreamLost"));
+      return finalResult;
+    }
+
+    async function uploadDirect(userId, file, fileMb) {
+      const form = new FormData();
+      form.append("file", file);
+
+      const res = await fetch(
+        `/api/v1/health/upload/stream?user_id=${encodeURIComponent(userId)}`,
+        { method: "POST", body: form },
+      );
+
+      if (res.status === 413 && isCloudHost()) {
+        progressDetail.textContent = t("error413");
+        return uploadViaGcs(userId, file, fileMb);
+      }
+
+      return consumeUploadStream(res);
+    }
+
+    async function uploadViaGcs(userId, file, fileMb) {
+      const contentType = file.name.toLowerCase().endsWith(".xml")
+        ? "application/xml"
+        : "application/octet-stream";
+
+      const signRes = await fetch(
+        `/api/v1/health/upload/signed-url?user_id=${encodeURIComponent(userId)}&filename=${encodeURIComponent(file.name)}`,
+        { method: "POST" },
+      );
+      if (!signRes.ok) {
+        const errData = await signRes.json().catch(() => ({}));
+        throw new Error(errData.detail || `Signed URL HTTP ${signRes.status}`);
+      }
+      const signed = await signRes.json();
+
+      currentStage = "gcs_upload";
+      progressLabel.textContent = stageLabel("gcs_upload");
+      renderStageList("gcs_upload", completedStages);
+
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", signed.upload_url);
+        xhr.setRequestHeader("Content-Type", signed.content_type || contentType);
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const pct = Math.min(35, Math.round((event.loaded / event.total) * 35));
+          updateProgress({ stage: "gcs_upload", percent: pct, file_size_mb: fileMb });
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Cloud Storage upload failed (HTTP ${xhr.status})`));
+        };
+        xhr.onerror = () => reject(new Error("Cloud Storage upload failed"));
+        xhr.send(file);
+      });
+
+      completedStages.add("gcs_upload");
+      const processRes = await fetch(
+        `/api/v1/health/upload/stream/gcs?user_id=${encodeURIComponent(userId)}&object_name=${encodeURIComponent(signed.object_name)}&filename=${encodeURIComponent(file.name)}`,
+        { method: "POST" },
+      );
+      return consumeUploadStream(processRes);
+    }
+
+    function ensureUserId() {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get("user_id");
+      let id = fromUrl || localStorage.getItem("purrslogic_user_id");
+      if (!id) {
+        id = "user_" + crypto.randomUUID().slice(0, 8);
+        localStorage.setItem("purrslogic_user_id", id);
+      }
+      document.getElementById("userId").value = id;
+      localStorage.setItem("purrslogic_user_id", id);
+      if (params.get("calendar") === "connected") {
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete("calendar");
+        window.history.replaceState({}, "", clean.pathname + clean.search);
+      }
+    }
+
+    async function refreshCalendarStatus() {
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) return;
+      const statusEl = document.getElementById("calendarOAuthStatus");
+      const connectBtn = document.getElementById("connectCalendarBtn");
+      const disconnectBtn = document.getElementById("disconnectCalendarBtn");
+      try {
+        const res = await fetch(`/api/v1/calendar/oauth/status?user_id=${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        const connected = data.status === "connected";
+        statusEl.innerHTML = connected
+          ? t("calendarConnected")
+          : `${t("calendarDisconnected")}<br/><span style="font-size:0.78rem">${t("calendarConnectHint")}</span>`;
+        document.getElementById("calendarOAuthBox").className = connected
+          ? "budget-source ok"
+          : "budget-source warn";
+        connectBtn.hidden = connected;
+        disconnectBtn.hidden = !connected;
+      } catch {
+        statusEl.textContent = t("calendarDisconnected");
+        connectBtn.hidden = false;
+        disconnectBtn.hidden = true;
+      }
+    }
+
+    document.getElementById("disconnectCalendarBtn").addEventListener("click", async () => {
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) return;
+      try {
+        await fetch(`/api/v1/calendar/oauth/disconnect?user_id=${encodeURIComponent(userId)}`, {
+          method: "DELETE",
+        });
+      } catch { /* ignore */ }
+      refreshCalendarStatus();
+    });
+
+    document.getElementById("connectCalendarBtn").addEventListener("click", () => {
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) return;
+      localStorage.setItem("purrslogic_user_id", userId);
+      window.location.href = `/api/v1/calendar/oauth/start?user_id=${encodeURIComponent(userId)}`;
+    });
+
+    document.getElementById("userId").addEventListener("change", () => {
+      localStorage.setItem("purrslogic_user_id", document.getElementById("userId").value.trim());
+      refreshCalendarStatus();
+    });
+
     applyTheme();
+    ensureUserId();
     applyLang();
+    refreshCalendarStatus();
   </script>
 </body>
 </html>

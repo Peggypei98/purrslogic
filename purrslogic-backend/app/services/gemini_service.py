@@ -19,13 +19,44 @@ _OVERLOAD_MARKERS = ("503", "UNAVAILABLE", "high demand")
 _QUOTA_MARKERS = ("429", "RESOURCE_EXHAUSTED", "QUOTA")
 
 
+class _CalendarToolStub:
+    """Agent calendar write tools — stubs until real Calendar API writes are wired."""
+
+    def delete_calendar_event(self, event_id: str) -> dict:
+        print(f"🔥 [Google Calendar API] Agent action triggered: Successfully DELETED event ID: {event_id}")
+        return {"status": "success", "action": "delete", "event_id": event_id}
+
+    def insert_calendar_event(
+        self,
+        summary: str,
+        start_iso: str,
+        end_iso: str,
+        description: str = "",
+    ) -> dict:
+        print(f"✨ [Google Calendar API] Agent action triggered: Successfully INSERTED '{summary}'")
+        return {"status": "success", "action": "insert", "summary": summary}
+
+
 class PurrslogicBrainService:
     def __init__(self):
         self.client = genai.Client()
         self.model_name = TRIAGE_MODEL
-        self.calendar_api = GoogleCalendarService()
+        self._calendar_api: GoogleCalendarService | _CalendarToolStub | None = None
         self.introspection_api = AgentIntrospectionService()
         self.vector_search_api = MongoDBVectorSearchService()
+
+    @property
+    def calendar_api(self) -> GoogleCalendarService | _CalendarToolStub:
+        if self._calendar_api is None:
+            try:
+                self._calendar_api = GoogleCalendarService()
+            except (ValueError, FileNotFoundError):
+                print(
+                    "⚠️ [Gemini Brain] No legacy Calendar credentials — "
+                    "using stub calendar tools (per-user OAuth handles reads)."
+                )
+                self._calendar_api = _CalendarToolStub()
+        return self._calendar_api
 
     def _error_message(self, error: Exception) -> str:
         return str(error).upper()

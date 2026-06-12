@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.env
+.env.*
+config/*.json
+config/token.json
+purrslogic_agent/.adk/
+*.db
+.git
+.gitignore
+*.md

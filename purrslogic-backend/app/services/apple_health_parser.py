@@ -6,7 +6,6 @@ Adapted from Peggy's original parse_health.py CLI script.
 from __future__ import annotations
 
 import csv
-import io
 import os
 import tempfile
 import xml.etree.ElementTree as ET
@@ -40,8 +39,55 @@ MOBILITY_TYPES = {
     "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": "WalkingAsymmetry",
 }
 
+# Legacy constants kept for datamodeling.sql reference; parser uses _classify_sleep_segment().
 SLEEP_ASLEEP_VALUES = frozenset({"2", "3", "4", "AsleepCore", "AsleepDeep", "AsleepREM"})
 SLEEP_DEEP_VALUES = frozenset({"3", "AsleepDeep"})
+
+
+def _sleep_value_samples(sleep_rows: list[tuple]) -> set[str]:
+    return {str(row[3]).strip() for row in sleep_rows[:8000] if row[3]}
+
+
+def _detect_sleep_encoding(sleep_rows: list[tuple]) -> str:
+    sample = _sleep_value_samples(sleep_rows)
+    if any("HKCategory" in v or "Asleep" in v or "InBed" in v or "Awake" in v for v in sample):
+        return "modern"
+    return "legacy"
+
+
+def _classify_sleep_segment(value: str, encoding: str) -> str:
+    """Return: in_bed | awake | asleep | deep | unknown."""
+    v = (value or "").strip()
+    if not v:
+        return "unknown"
+
+    compact = v.replace("HKCategoryValueSleepAnalysis", "").replace("_", "").lower()
+
+    if encoding == "modern":
+        if v == "2" or "awake" in compact:
+            return "awake"
+        if v == "0" or compact == "inbed":
+            return "in_bed"
+        if v == "4" or "asleepdeep" in compact:
+            return "deep"
+        if v in ("3", "5") or "asleepcore" in compact or "asleeprem" in compact:
+            return "asleep"
+        if v == "1" or "asleepunspecified" in compact or compact == "asleep":
+            return "asleep"
+        return "unknown"
+
+    # Legacy numeric export (matches datamodeling.sql)
+    if v == "2":
+        return "asleep"
+    if v == "3":
+        return "deep"
+    if v == "4":
+        return "asleep"
+    if v == "0":
+        return "in_bed"
+    if v == "1":
+        return "asleep"
+    return "unknown"
 
 
 @dataclass
@@ -56,6 +102,8 @@ class ParseCounts:
 class AppleHealthParseResult:
     counts: ParseCounts = field(default_factory=ParseCounts)
     daily_recovery_summary: list[dict] = field(default_factory=list)
+    activity_daily: list[dict] = field(default_factory=list)
+    mobility_daily: list[dict] = field(default_factory=list)
     csv_files: dict[str, str] = field(default_factory=dict)
 
 
@@ -119,58 +167,187 @@ def _aggregate_daily_recovery(
     vitals_rows: list[tuple],
     sleep_rows: list[tuple],
 ) -> list[dict]:
-    """Mirror purrslogic.gcs_health.view_daily_recovery_summary SQL logic."""
+    """Build daily sleep + vitals rows (Pacific), main sleep > 120 min."""
+    encoding = _detect_sleep_encoding(sleep_rows)
     sleep_by_date: dict[str, dict[str, float]] = defaultdict(
-        lambda: {"total_in_bed": 0.0, "total_sleep": 0.0, "deep_sleep": 0.0}
+        lambda: {
+            "total_in_bed": 0.0,
+            "total_sleep": 0.0,
+            "deep_sleep": 0.0,
+            "awake": 0.0,
+        }
     )
     for _metric, start, end, value in sleep_rows:
-        start_dt = _parse_apple_timestamp(start)
-        end_dt = _parse_apple_timestamp(end)
-        minutes = (end_dt - start_dt).total_seconds() / 60.0
-        check_date = _pacific_date(end_dt)
-        sleep_by_date[check_date]["total_in_bed"] += minutes
-        if value in SLEEP_ASLEEP_VALUES:
-            sleep_by_date[check_date]["total_sleep"] += minutes
-        if value in SLEEP_DEEP_VALUES:
-            sleep_by_date[check_date]["deep_sleep"] += minutes
+        _apply_sleep_segment(sleep_by_date, start, end, value, encoding)
 
-    vitals_by_date: dict[str, dict[str, list[float]]] = defaultdict(
-        lambda: {"HRV": [], "RestingHeartRate": [], "RespiratoryRate": []}
+    vitals_by_date: dict[str, dict[str, dict[str, float]]] = defaultdict(
+        lambda: {
+            "HRV": {"sum": 0.0, "count": 0.0},
+            "RestingHeartRate": {"sum": 0.0, "count": 0.0},
+            "RespiratoryRate": {"sum": 0.0, "count": 0.0},
+        }
     )
     for metric, start, _end, value, _unit in vitals_rows:
-        if metric not in ("HRV", "RestingHeartRate", "RespiratoryRate"):
-            continue
-        try:
-            check_date = _pacific_date(_parse_apple_timestamp(start))
-            vitals_by_date[check_date][metric].append(float(value))
-        except (TypeError, ValueError):
-            continue
+        _apply_vital_sample(vitals_by_date, metric, start, value)
 
+    return _finalize_daily_recovery(sleep_by_date, vitals_by_date)
+
+
+def _infer_sleep_encoding(value: str, current: str) -> str:
+    if current == "modern":
+        return current
+    sample = (value or "").strip()
+    if any(token in sample for token in ("HKCategory", "Asleep", "InBed", "Awake")):
+        return "modern"
+    return current
+
+
+def _apply_sleep_segment(
+    sleep_by_date: dict[str, dict[str, float]],
+    start: str,
+    end: str,
+    value: str,
+    encoding: str,
+) -> None:
+    start_dt = _parse_apple_timestamp(start)
+    end_dt = _parse_apple_timestamp(end)
+    minutes = (end_dt - start_dt).total_seconds() / 60.0
+    check_date = _pacific_date(end_dt)
+    bucket = sleep_by_date[check_date]
+    segment = _classify_sleep_segment(value, encoding)
+
+    if segment == "in_bed":
+        bucket["total_in_bed"] += minutes
+    elif segment == "awake":
+        bucket["awake"] += minutes
+        bucket["total_in_bed"] += minutes
+    elif segment == "asleep":
+        bucket["total_sleep"] += minutes
+        bucket["total_in_bed"] += minutes
+    elif segment == "deep":
+        bucket["total_sleep"] += minutes
+        bucket["deep_sleep"] += minutes
+        bucket["total_in_bed"] += minutes
+
+
+def _apply_activity_sample(
+    activity_by_date: dict[str, dict[str, float]],
+    metric: str,
+    start: str,
+    value: str,
+) -> None:
+    try:
+        check_date = _pacific_date(_parse_apple_timestamp(start))
+        bucket = activity_by_date[check_date]
+        amount = float(value)
+        if metric == "ActiveEnergyBurned":
+            bucket["active_kcal"] += amount
+        elif metric == "AppleExerciseTime":
+            bucket["exercise_min"] += amount
+    except (TypeError, ValueError):
+        return
+
+
+def _apply_mobility_sample(
+    mobility_by_date: dict[str, dict[str, float]],
+    metric: str,
+    start: str,
+    value: str,
+) -> None:
+    try:
+        check_date = _pacific_date(_parse_apple_timestamp(start))
+        bucket = mobility_by_date[check_date]
+        amount = float(value)
+        if metric == "WalkingSpeed":
+            bucket["speed_sum"] += amount
+            bucket["speed_count"] += 1
+        elif metric == "WalkingAsymmetry":
+            bucket["asym_sum"] += amount
+            bucket["asym_count"] += 1
+    except (TypeError, ValueError):
+        return
+
+
+def _finalize_activity_daily(activity_by_date: dict[str, dict[str, float]]) -> list[dict]:
+    rows: list[dict] = []
+    for check_date in sorted(activity_by_date.keys()):
+        bucket = activity_by_date[check_date]
+        rows.append({
+            "date": check_date,
+            "active_kcal": round(bucket.get("active_kcal", 0.0), 1),
+            "exercise_minutes": round(bucket.get("exercise_min", 0.0), 1),
+        })
+    return rows
+
+
+def _finalize_mobility_daily(mobility_by_date: dict[str, dict[str, float]]) -> list[dict]:
+    rows: list[dict] = []
+    for check_date in sorted(mobility_by_date.keys()):
+        bucket = mobility_by_date[check_date]
+        speed_count = int(bucket.get("speed_count", 0))
+        asym_count = int(bucket.get("asym_count", 0))
+        rows.append({
+            "date": check_date,
+            "avg_walking_speed_mps": (
+                round(bucket["speed_sum"] / speed_count, 3) if speed_count else None
+            ),
+            "avg_walking_asymmetry_pct": (
+                round(bucket["asym_sum"] / asym_count, 2) if asym_count else None
+            ),
+        })
+    return rows
+
+
+def _apply_vital_sample(
+    vitals_by_date: dict[str, dict[str, dict[str, float]]],
+    metric: str,
+    start: str,
+    value: str,
+) -> None:
+    if metric not in ("HRV", "RestingHeartRate", "RespiratoryRate"):
+        return
+    try:
+        check_date = _pacific_date(_parse_apple_timestamp(start))
+        bucket = vitals_by_date[check_date][metric]
+        bucket["sum"] += float(value)
+        bucket["count"] += 1
+    except (TypeError, ValueError):
+        return
+
+
+def _finalize_daily_recovery(
+    sleep_by_date: dict[str, dict[str, float]],
+    vitals_by_date: dict[str, dict[str, dict[str, float]]],
+) -> list[dict]:
     rows: list[dict] = []
     for check_date in sorted(sleep_by_date.keys(), reverse=True):
         sleep = sleep_by_date[check_date]
         total_sleep = sleep["total_sleep"]
         if total_sleep <= 120:
-            continue
+            in_bed_net = sleep["total_in_bed"] - sleep["awake"]
+            if in_bed_net > 120:
+                total_sleep = in_bed_net
+            else:
+                continue
 
         deep_sleep = sleep["deep_sleep"]
         vitals = vitals_by_date.get(check_date, {})
-        deep_ratio = round(deep_sleep / total_sleep * 100, 2) if total_sleep else None
-        hrv_vals = vitals.get("HRV", [])
-        rhr_vals = vitals.get("RestingHeartRate", [])
-        resp_vals = vitals.get("RespiratoryRate", [])
+        deep_ratio = round(deep_sleep / total_sleep * 100, 2) if total_sleep and deep_sleep else None
+
+        def _avg(metric: str) -> float | None:
+            bucket = vitals.get(metric, {})
+            count = int(bucket.get("count", 0))
+            if count <= 0:
+                return None
+            return round(bucket["sum"] / count, 2)
 
         rows.append({
             "date": check_date,
             "total_sleep_minutes": round(total_sleep, 1),
             "deep_sleep_ratio_pct": deep_ratio,
-            "hrv_ms": round(sum(hrv_vals) / len(hrv_vals), 2) if hrv_vals else None,
-            "resting_heart_rate_bpm": (
-                round(sum(rhr_vals) / len(rhr_vals), 2) if rhr_vals else None
-            ),
-            "respiratory_rate_pm": (
-                round(sum(resp_vals) / len(resp_vals), 2) if resp_vals else None
-            ),
+            "hrv_ms": _avg("HRV"),
+            "resting_heart_rate_bpm": _avg("RestingHeartRate"),
+            "respiratory_rate_pm": _avg("RespiratoryRate"),
         })
 
     return rows
@@ -191,36 +368,41 @@ def parse_export_xml(
     write_csv_dir: Path | None = None,
     on_progress: ProgressCallback | None = None,
 ) -> AppleHealthParseResult:
-    """Stream-parse export.xml into CSV shards and a daily recovery summary."""
+    """Stream-parse export.xml into optional CSV shards and a daily recovery summary."""
     counts = ParseCounts()
-    vitals_rows: list[tuple] = []
-    sleep_rows: list[tuple] = []
-    activity_rows: list[tuple] = []
-    mobility_rows: list[tuple] = []
-
-    csv_buffers: dict[str, io.StringIO] | None = None
-    writers: dict[str, csv.writer] = {}
-    if write_csv_dir:
-        write_csv_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        csv_buffers = {
-            "vitals": io.StringIO(),
-            "sleep": io.StringIO(),
-            "activity": io.StringIO(),
-            "mobility": io.StringIO(),
+    sleep_encoding = "legacy"
+    sleep_by_date: dict[str, dict[str, float]] = defaultdict(
+        lambda: {
+            "total_in_bed": 0.0,
+            "total_sleep": 0.0,
+            "deep_sleep": 0.0,
+            "awake": 0.0,
         }
-        writers["vitals"] = csv.writer(csv_buffers["vitals"])
-        writers["sleep"] = csv.writer(csv_buffers["sleep"])
-        writers["activity"] = csv.writer(csv_buffers["activity"])
-        writers["mobility"] = csv.writer(csv_buffers["mobility"])
-        writers["vitals"].writerow(["metric", "startDate", "endDate", "value", "unit"])
-        writers["sleep"].writerow(["metric", "startDate", "endDate", "value"])
-        writers["activity"].writerow(["metric", "startDate", "endDate", "value", "unit"])
-        writers["mobility"].writerow(["metric", "startDate", "endDate", "value", "unit"])
+    )
+    vitals_by_date: dict[str, dict[str, dict[str, float]]] = defaultdict(
+        lambda: {
+            "HRV": {"sum": 0.0, "count": 0.0},
+            "RestingHeartRate": {"sum": 0.0, "count": 0.0},
+            "RespiratoryRate": {"sum": 0.0, "count": 0.0},
+        }
+    )
+    activity_by_date: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"active_kcal": 0.0, "exercise_min": 0.0}
+    )
+    mobility_by_date: dict[str, dict[str, float]] = defaultdict(
+        lambda: {
+            "speed_sum": 0.0,
+            "speed_count": 0.0,
+            "asym_sum": 0.0,
+            "asym_count": 0.0,
+        }
+    )
 
+    writers: dict[str, csv.writer] = {}
     file_handles: list = []
     try:
         if write_csv_dir:
+            write_csv_dir.mkdir(parents=True, exist_ok=True)
             vitals_file = (write_csv_dir / "apple_health_vitals.csv").open(
                 "w", newline="", encoding="utf-8"
             )
@@ -263,22 +445,27 @@ def parse_export_xml(
 
                 if record_type in VITALS_TYPES:
                     metric = VITALS_TYPES[record_type]
-                    writers["vitals"].writerow([metric, start, end, val, unit])
-                    vitals_rows.append((metric, start, end, val, unit))
+                    if "vitals" in writers:
+                        writers["vitals"].writerow([metric, start, end, val, unit])
+                    _apply_vital_sample(vitals_by_date, metric, start, val)
                     counts.vitals += 1
                 elif record_type == "HKCategoryTypeIdentifierSleepAnalysis":
-                    writers["sleep"].writerow(["SleepAnalysis", start, end, val])
-                    sleep_rows.append(("SleepAnalysis", start, end, val))
+                    sleep_encoding = _infer_sleep_encoding(val, sleep_encoding)
+                    if "sleep" in writers:
+                        writers["sleep"].writerow(["SleepAnalysis", start, end, val])
+                    _apply_sleep_segment(sleep_by_date, start, end, val, sleep_encoding)
                     counts.sleep += 1
                 elif record_type in ACTIVITY_TYPES:
                     metric = ACTIVITY_TYPES[record_type]
-                    writers["activity"].writerow([metric, start, end, val, unit])
-                    activity_rows.append((metric, start, end, val, unit))
+                    if "activity" in writers:
+                        writers["activity"].writerow([metric, start, end, val, unit])
+                    _apply_activity_sample(activity_by_date, metric, start, val)
                     counts.activity += 1
                 elif record_type in MOBILITY_TYPES:
                     metric = MOBILITY_TYPES[record_type]
-                    writers["mobility"].writerow([metric, start, end, val, unit])
-                    mobility_rows.append((metric, start, end, val, unit))
+                    if "mobility" in writers:
+                        writers["mobility"].writerow([metric, start, end, val, unit])
+                    _apply_mobility_sample(mobility_by_date, metric, start, val)
                     counts.mobility += 1
 
                 records_seen += 1
@@ -317,7 +504,9 @@ def parse_export_xml(
             },
         )
         _emit_progress(on_progress, "aggregating", 85)
-        daily = _aggregate_daily_recovery(vitals_rows, sleep_rows)
+        daily = _finalize_daily_recovery(sleep_by_date, vitals_by_date)
+        activity_daily = _finalize_activity_daily(activity_by_date)
+        mobility_daily = _finalize_mobility_daily(mobility_by_date)
         csv_files: dict[str, str] = {}
         if write_csv_dir:
             csv_files = {
@@ -326,12 +515,12 @@ def parse_export_xml(
                 "activity": str(write_csv_dir / "apple_health_activity.csv"),
                 "mobility": str(write_csv_dir / "apple_health_mobility.csv"),
             }
-        elif csv_buffers:
-            csv_files = {key: buf.getvalue() for key, buf in csv_buffers.items()}
 
         return AppleHealthParseResult(
             counts=counts,
             daily_recovery_summary=daily,
+            activity_daily=activity_daily,
+            mobility_daily=mobility_daily,
             csv_files=csv_files,
         )
     finally:
@@ -349,6 +538,26 @@ def parse_apple_health_zip(
         _emit_progress(on_progress, "extracting_zip", 10)
         xml_path = extract_export_xml_from_zip(zip_path, Path(work_dir))
         return parse_export_xml(xml_path, write_csv_dir=csv_output_dir, on_progress=on_progress)
+
+
+def parse_apple_health_file(
+    file_path: Path,
+    filename: str | None = None,
+    csv_output_dir: Path | None = None,
+    on_progress: ProgressCallback | None = None,
+) -> AppleHealthParseResult:
+    """Parse from a zip or xml path on disk (lower memory than loading bytes)."""
+    resolved_name = filename or file_path.name
+    lower = resolved_name.lower()
+    if lower.endswith(".xml"):
+        _emit_progress(on_progress, "received", 8)
+        return parse_export_xml(file_path, write_csv_dir=csv_output_dir, on_progress=on_progress)
+
+    if lower.endswith(".zip"):
+        _emit_progress(on_progress, "received", 8)
+        return parse_apple_health_zip(file_path, csv_output_dir=csv_output_dir, on_progress=on_progress)
+
+    raise ValueError("Upload export.zip or export.xml from Apple Health.")
 
 
 def parse_apple_health_upload(

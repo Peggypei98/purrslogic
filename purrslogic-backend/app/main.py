@@ -1,9 +1,12 @@
 import os
+import asyncio
+import json
+import tempfile
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from typing import Optional
@@ -19,6 +22,9 @@ from app.services.adk_brain_service import AdkBrainService
 from app.services.guardrail_service import guardrail_service
 from app.services.gemini_service import PurrslogicBrainService
 from app.services.health_ingest_service import health_ingest_service
+from app.services.gcs_upload_service import gcs_upload_service
+from app.services.google_oauth_service import google_oauth_service
+from app.services.calendar_triage_service import calendar_triage_service
 from app.services.vector_service import MongoDBVectorSearchService
 from app.services.mongodb_mcp_service import mongodb_mcp
 from app.config.model_config import TRIAGE_MODEL, performance_profile
@@ -73,6 +79,24 @@ recovery_service = MicroRecoveryService()
 # ADK primary brain (singleton); legacy gemini_service kept as fallback
 brain_service = adk_brain_service
 legacy_brain_service = PurrslogicBrainService()
+
+
+async def _get_calendar_service(user_id: str) -> GoogleCalendarService:
+    """Per-user OAuth tokens first; legacy config/token.json as dev fallback."""
+    calendar_service = await GoogleCalendarService.for_user(user_id)
+    if calendar_service:
+        return calendar_service
+    try:
+        return GoogleCalendarService()
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "Google Calendar not connected. "
+                f"Visit /api/v1/calendar/oauth/start?user_id={user_id} to authorize."
+            ),
+        ) from error
+
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 if STATIC_DIR.is_dir():
@@ -149,6 +173,70 @@ async def upload_apple_health_export_stream(
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 
+@app.post("/api/v1/health/upload/signed-url")
+async def health_upload_signed_url(
+    user_id: str = "peggy_pei_28",
+    filename: str = "export.zip",
+):
+    """Return a signed PUT URL for large exports (bypasses Cloud Run 32 MiB request limit)."""
+    try:
+        lower = filename.lower()
+        content_type = "application/xml" if lower.endswith(".xml") else "application/octet-stream"
+        return gcs_upload_service.create_signed_upload_url(
+            user_id=user_id,
+            filename=filename,
+            content_type=content_type,
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/v1/health/upload/stream/gcs")
+async def upload_apple_health_export_from_gcs(
+    user_id: str = "peggy_pei_28",
+    object_name: str = "",
+    filename: str = "export.zip",
+):
+    """Parse an object already uploaded via signed GCS URL; streams NDJSON progress."""
+    if not object_name:
+        raise HTTPException(status_code=400, detail="object_name is required.")
+    try:
+        gcs_upload_service.validate_object_for_user(object_name, user_id)
+
+        async def stream_and_cleanup():
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                upload_path = Path(tmp_dir) / PurePosixPath(filename or "export.zip").name
+                await asyncio.to_thread(
+                    gcs_upload_service.download_object_to_file,
+                    object_name,
+                    upload_path,
+                )
+                if upload_path.stat().st_size == 0:
+                    yield json.dumps({"type": "error", "detail": "Empty file upload."}) + "\n"
+                    return
+                try:
+                    async for line in health_ingest_service.process_upload_stream_from_path(
+                        file_path=upload_path,
+                        filename=filename or "export.zip",
+                        user_id=user_id,
+                    ):
+                        yield line
+                finally:
+                    await asyncio.to_thread(gcs_upload_service.delete_object, object_name)
+
+        return StreamingResponse(stream_and_cleanup(), media_type="application/x-ndjson")
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
 @app.get("/api/v1/health/recovery-summary")
 async def get_health_recovery_summary(user_id: str = "peggy_pei_28", limit: int = 7):
     """Return latest uploaded Apple Health daily recovery summary from MongoDB."""
@@ -167,11 +255,54 @@ async def get_health_recovery_summary(user_id: str = "peggy_pei_28", limit: int 
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
+
+@app.get("/api/v1/health/analytics")
+async def get_health_analytics(user_id: str = "peggy_pei_28"):
+    """Rolling averages, monthly/yearly summaries, and export date range."""
+    try:
+        result = await health_ingest_service.get_analytics(user_id=user_id)
+        if result.get("status") == "not_found":
+            raise HTTPException(status_code=404, detail=result.get("message"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/v1/calendar/oauth/start")
+async def calendar_oauth_start(user_id: str):
+    """Redirect browser to Google OAuth consent (Web client required)."""
+    try:
+        return RedirectResponse(await google_oauth_service.authorization_url(user_id))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/v1/calendar/oauth/callback")
+async def calendar_oauth_callback(code: str, state: str):
+    """OAuth redirect target — persists refresh token per user_id (state)."""
+    try:
+        await google_oauth_service.exchange_code(code=code, user_id=state)
+        return RedirectResponse(f"/health?calendar=connected&user_id={state}")
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/v1/calendar/oauth/status")
+async def calendar_oauth_status(user_id: str):
+    return await google_oauth_service.get_status(user_id)
+
+
+@app.delete("/api/v1/calendar/oauth/disconnect")
+async def calendar_oauth_disconnect(user_id: str):
+    return await google_oauth_service.disconnect(user_id)
+
 # Fetch unique historical event titles for onboarding
 @app.get("/api/v1/calendar/onboarding-history")
-async def get_onboarding_history(months: int = 3):
+async def get_onboarding_history(user_id: str, months: int = 3):
     try:
-        calendar_service = GoogleCalendarService()
+        calendar_service = await _get_calendar_service(user_id)
         unique_titles = calendar_service.get_historical_events(months_back=months)
         
         if isinstance(unique_titles, dict) and "error" in unique_titles:
@@ -284,104 +415,36 @@ async def get_today_calendar(
     simulate_budget: Optional[int] = None
 ):
     try:
-        # 1. Fetch custom rules matrix from MongoDB Atlas
-        user_profile = await db.user_profiles.find_one({"user_id": user_id})
-        custom_rules = user_profile.get("custom_heuristic_rules", []) if user_profile else []
-            
-        # 2. Fetch raw today's agenda from Google Calendar API
-        calendar_service = GoogleCalendarService()
-        raw_events = calendar_service.get_today_events()
-        if isinstance(raw_events, dict):
-            raise HTTPException(status_code=400, detail=raw_events.get("error", "Failed to fetch calendar events"))
-            
-        # 3. Dynamic 5D energy matrix matching & summation
-        classified_events, total_mental_cost, total_physical_cost = classifier_service.calculate_and_tag_agenda(
-            raw_events=raw_events,
-            custom_rules=custom_rules
+        return await calendar_triage_service.run_triage(
+            user_id=user_id,
+            simulate_budget=simulate_budget,
+            bq_service=bq_service,
+            brain_service=brain_service,
+            legacy_brain_service=legacy_brain_service,
         )
-        total_agenda_cost = total_mental_cost + total_physical_cost
-
-        # 4. Defensive handling for health metrics budget
-        budget_meta = None
-        if simulate_budget is not None:
-            today_health_budget = simulate_budget
-            budget_meta = {"source": "simulated", "source_date": None, "is_fallback": False}
-        else:
-            resolution = await health_ingest_service.get_budget_resolution(user_id=user_id)
-            if resolution and resolution.budget is not None:
-                today_health_budget = resolution.budget
-                from app.services.health_budget import budget_meta_dict
-                budget_meta = budget_meta_dict(resolution)
-            elif bq_service:
-                today_health_budget = bq_service.get_today_health_budget(user_id=user_id)
-                budget_meta = {"source": "bigquery", "source_date": None, "is_fallback": True}
-            else:
-                today_health_budget = 45
-                budget_meta = {"source": "default", "source_date": None, "is_fallback": True}
-
-        # 5. Core Mathematical Energy Accounting Formula
-        remaining_energy_net = today_health_budget - total_agenda_cost
-        
-        # 6. Proactive Overload Triaging Mode
-        is_overloaded = remaining_energy_net < 0
-        recommendations = []
-        triage_status = "HEALTHY_BALANCED"
-
-        if is_overloaded:
-            triage_status = "ENERGY_OVERLOAD_WARNING"
-            recommendations = recovery_service.get_top_recommendations(
-                needed_charge=abs(remaining_energy_net),
-                limit=2
-            )
-            
-        # 7. Day 19 safety guardrails — partition deletable vs IMMOVABLE-protected events
-        guardrail_service.register_agenda(classified_events)
-        deletable_events, protected_events = guardrail_service.partition_events(classified_events)
-
-        # 8. Bundle everything and invoke agent reasoning
-        payload_for_ai = {
-            "user_id": user_id,
-            "triage_summary": {
-                "status_code": triage_status,
-                "is_overloaded_warning": is_overloaded,
-                "physiological_budget": today_health_budget,
-                "budget_meta": budget_meta,
-                "total_agenda_cost_burn": total_agenda_cost,
-                "remaining_net_energy": remaining_energy_net
-            },
-            "proactive_interventions": recommendations,
-            "events": classified_events,
-            "safety_guardrails": {
-                "policy": "NEVER delete IMMOVABLE events. Runtime blocks unsafe deletes.",
-                "deletable_event_ids": [e["event_id"] for e in deletable_events if e.get("event_id")],
-                "deletable_events": deletable_events,
-                "protected_events": protected_events,
-            },
-        }
-        
-        # Invoke Google ADK agent (fallback to legacy gemini loop on failure)
-        brain_response = await brain_service.generate_triage_coaching(triage_data=payload_for_ai)
-        if "error" in brain_response:
-            print(f"⚠️ [ADK Brain] Falling back to legacy gemini_service: {brain_response['error']}")
-            brain_response = await legacy_brain_service.generate_triage_coaching(
-                triage_data=payload_for_ai
-            )
-
-        if "error" in brain_response:
-            raise HTTPException(status_code=503, detail=brain_response["error"])
-
-        return {
-            "status": "success",
-            "user_id": user_id,
-            "triage_summary": payload_for_ai["triage_summary"],
-            "agent_decision_center": brain_response.get("agent_coaching_text"),
-            "proactive_interventions": brain_response.get("automated_actions_executed", []),
-            "events": classified_events
-        }
-        
-        
-        
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/v1/calendar/today/stream")
+async def get_today_calendar_stream(
+    user_id: str = "peggy_pei_28",
+    simulate_budget: Optional[int] = None,
+):
+    """NDJSON progress while running calendar triage (same final payload as /today)."""
+    return StreamingResponse(
+        calendar_triage_service.run_triage_stream(
+            user_id=user_id,
+            simulate_budget=simulate_budget,
+            bq_service=bq_service,
+            brain_service=brain_service,
+            legacy_brain_service=legacy_brain_service,
+        ),
+        media_type="application/x-ndjson",
+    )

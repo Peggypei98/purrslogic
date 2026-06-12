@@ -30,10 +30,15 @@ def init_agent_observability():
 
     provider = TracerProvider()
 
+    on_cloud_run = bool(os.getenv("K_SERVICE"))
+
     if PHOENIX_COLLECTOR_URL:
         print(f"🌐 [Phoenix Radar] Routing telemetry to remote collector: {PHOENIX_COLLECTOR_URL}")
         exporter = OTLPSpanExporter(endpoint=f"{PHOENIX_COLLECTOR_URL}/v1/traces")
         provider.add_span_processor(BatchSpanProcessor(exporter))
+
+    elif on_cloud_run:
+        print("☁️ [Phoenix Radar] Cloud Run — skipping embedded Phoenix UI (set PHOENIX_COLLECTOR_URL for remote traces)")
 
     else:
         phoenix_ui_port = int(os.getenv("PHOENIX_PORT", "6006"))
