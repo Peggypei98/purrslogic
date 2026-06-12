@@ -221,3 +221,4 @@ __marimo__/
 *.json
 purrslogic-backend/config/*.json
 purrslogic-backend/.env
+purrslogic-backend/purrslogic_agent/.adk/
